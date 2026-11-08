@@ -26,7 +26,6 @@
       <div><h1>Supplier–Buyer Agent Collaboration</h1>
         <p>Explore a delivery proposal against the buyer’s terms, with evidence from the agent response.</p>
       </div>
-      <span class="demo-label">Synthetic demonstration</span>
     </section>
     <div class="workspace">
     <aside class="context-panel" aria-label="Demonstration context">
@@ -45,24 +44,28 @@
       </details>
       <details id="contoso-controls" hidden>
       <summary>Connection settings</summary>
+      <p class="context-intro">Choose where your question is processed. These controls become available after you sign in with Microsoft.</p>
       <fieldset><legend>Network routing</legend>
       <label for="network-mode">Network mode</label>
       <select id="network-mode" disabled>
         <option value="legacy">Contoso AWS Agent (Nova)</option>
         <option value="contoso">Contoso Agent Network (A2A)</option>
       </select>
+      <p class="route-note"><strong>Nova:</strong> get an answer from the AWS model, without calling Foundry or Copilot Studio.
+        <strong>Agent Network (A2A):</strong> send the question through AWS and the Azure Gateway to the private Foundry agent, which consults Copilot Studio.</p>
       <label for="contoso-integration">Gateway integration</label>
       <select id="contoso-integration" disabled>
         <option value="a2a" selected>A2A</option>
         <option value="sdk" disabled hidden>Responses SDK — deferred</option>
       </select>
+      <p class="route-note">Selects the integration used by the Gateway. Only A2A is enabled in this demo.</p>
       <label for="studio-variant">Copilot Studio agent</label>
       <select id="studio-variant" disabled>
         <option value="copilot-harness" selected>Contoso Copilot Studio Agent</option>
         <option value="standard" disabled hidden>Standard — deferred</option>
       </select>
-      <p class="route-note">Required route: Contoso AWS Agent → A2A → Contoso Foundry Agent → Contoso Copilot Studio Agent.
-        Enable the agent network only after this route is verified live. It sends only your latest question.
+      <p class="route-note">Selects the Copilot Studio agent consulted by Foundry. This demo has one available Studio agent.</p>
+      <p class="route-note">The agent network sends only your latest question.
         Source attribution and execution traces below come from the actual response, not these selections.</p>
       </fieldset>
       </details>
