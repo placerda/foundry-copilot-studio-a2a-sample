@@ -30,7 +30,19 @@ for (const [device, size] of [["desktop", { width: 1440, height: 1000 }], ["mobi
     await page.addInitScript(() => { window.contosoTestEnabled = true; });
     await page.goto("/");
     await expect(page.locator("#delivery-context")).not.toHaveAttribute("open", "");
-    await expect(page.locator("#contoso-controls")).not.toHaveAttribute("open", "");
+    await expect(page.locator("select")).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "How the agents collaborate" })).toBeVisible();
+    expect(await page.locator(".connection-panel").evaluate(node =>
+      !!(node.previousElementSibling?.classList.contains("chat-panel")))).toBe(true);
+    await expect(page.locator(".agent-flow li")).toHaveCount(3);
+    await expect(page.locator(".agent-flow")).toContainText("Microsoft Foundry");
+    await expect(page.locator(".agent-flow")).toContainText("Copilot Studio");
+    await expect(page.locator(".flow-link strong")).toHaveText(["A2A 1.0", "A2A 1.0"]);
+    await expect(page.locator(".client-protocol")).toHaveText("HTTPS / JSON");
+    expect(await page.locator(".agent-flow img").evaluateAll(images =>
+      images.length === 2 && images.every(image => image.complete && image.naturalWidth > 0))).toBe(true);
+    await expect(page.locator(".diagram-note")).toContainText("not a live execution trace");
+    await expect(page.locator(".access-path")).not.toHaveAttribute("open", "");
     await expect(page.getByText("Synthetic demonstration", { exact: true })).toHaveCount(0);
     await expect(page.locator("#reset")).toBeHidden();
     await expect(page.locator("#logout")).toBeHidden();
@@ -46,12 +58,12 @@ for (const [device, size] of [["desktop", { width: 1440, height: 1000 }], ["mobi
     await expect(page.locator("#login")).toBeHidden();
     await expect(page.locator("#reset")).toBeVisible();
     await expect(page.locator("#logout")).toBeVisible();
-    await page.locator("#contoso-controls > summary").click();
-    await expect(page.locator("#contoso-controls")).toContainText("without calling Foundry or Copilot Studio");
-    await expect(page.locator("#contoso-controls")).toContainText("private Foundry agent, which consults Copilot Studio");
-    await expect(page.locator("#contoso-controls")).toContainText("Only A2A is enabled in this demo");
-    await expect(page.locator("#contoso-controls")).toContainText("one available Studio agent");
-    await page.getByLabel("Network mode").selectOption("contoso");
+    await page.locator(".access-path > summary").click();
+    await expect(page.locator(".access-path")).toContainText("AWS Lambda requester");
+    await expect(page.locator(".access-path")).toContainText("not a separate conversational agent");
+    await expect(page.locator(".access-path")).toContainText("Azure Functions Gateway");
+    await expect(page.locator(".access-path")).toContainText("JSON-RPC 2.0 over HTTPS");
+    await page.locator(".access-path > summary").click();
     let payload;
     await page.route(functionURL, route => {
       payload = route.request().postDataJSON();

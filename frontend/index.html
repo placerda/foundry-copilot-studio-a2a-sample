@@ -42,33 +42,6 @@
       <section class="evidence-note"><h3>Keep the decision grounded</h3><p>Ask about conditions and evidence limits. A response is not authorization to change an order or approve a delivery.</p></section>
       </div>
       </details>
-      <details id="contoso-controls" hidden>
-      <summary>Connection settings</summary>
-      <p class="context-intro">Choose where your question is processed. These controls become available after you sign in with Microsoft.</p>
-      <fieldset><legend>Network routing</legend>
-      <label for="network-mode">Network mode</label>
-      <select id="network-mode" disabled>
-        <option value="legacy">Contoso AWS Agent (Nova)</option>
-        <option value="contoso">Contoso Agent Network (A2A)</option>
-      </select>
-      <p class="route-note"><strong>Nova:</strong> get an answer from the AWS model, without calling Foundry or Copilot Studio.
-        <strong>Agent Network (A2A):</strong> send the question through AWS and the Azure Gateway to the private Foundry agent, which consults Copilot Studio.</p>
-      <label for="contoso-integration">Gateway integration</label>
-      <select id="contoso-integration" disabled>
-        <option value="a2a" selected>A2A</option>
-        <option value="sdk" disabled hidden>Responses SDK — deferred</option>
-      </select>
-      <p class="route-note">Selects the integration used by the Gateway. Only A2A is enabled in this demo.</p>
-      <label for="studio-variant">Copilot Studio agent</label>
-      <select id="studio-variant" disabled>
-        <option value="copilot-harness" selected>Contoso Copilot Studio Agent</option>
-        <option value="standard" disabled hidden>Standard — deferred</option>
-      </select>
-      <p class="route-note">Selects the Copilot Studio agent consulted by Foundry. This demo has one available Studio agent.</p>
-      <p class="route-note">The agent network sends only your latest question.
-        Source attribution and execution traces below come from the actual response, not these selections.</p>
-      </fieldset>
-      </details>
     </aside>
     <section class="chat-panel" aria-label="Collaboration workspace">
       <header class="chat-heading"><div><h2>Conversation</h2><p>This conversation is stored only in this page's memory.</p></div>
@@ -98,6 +71,36 @@
       <div class="composer-actions"><p id="composer-hint">Review answers and sources before making a business decision.</p><button id="send" disabled>Send</button></div>
     </form>
     </div>
+    </section>
+    <section class="connection-panel" aria-labelledby="connection-title">
+      <h2 id="connection-title">How the agents collaborate</h2>
+      <p class="connection-intro">Foundry routes your question. When a capability matches, it asks Copilot Studio for an evidence-backed answer.</p>
+      <figure class="connection-diagram">
+        <ol class="agent-flow" aria-label="Browser uses HTTPS and JSON to AWS Lambda. Lambda reaches Foundry through the Gateway using A2A 1.0. Foundry communicates with Copilot Studio using A2A 1.0.">
+          <li>
+            <svg class="product-icon browser-icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="8" width="40" height="32" rx="3"/><path d="M4 17h40M10 12h2m3 0h2m3 0h2M15 25l-5 4 5 4m18-8 5 4-5 4m-7-9-4 18"/></svg>
+            <h3>Your question</h3><p>Browser → AWS Lambda requester.</p><p class="client-protocol">HTTPS / JSON</p>
+          </li>
+          <li>
+            <span class="flow-link"><span aria-hidden="true">→</span><strong>A2A 1.0</strong><small>via Gateway</small></span>
+            <img class="product-icon" src="./assets/foundry.svg" width="40" height="40" alt="">
+            <h3>Microsoft Foundry</h3><p>The private agent finds<br>the matching capability.</p>
+          </li>
+          <li>
+            <span class="flow-link"><span aria-hidden="true">↔</span><strong>A2A 1.0</strong><small>agent to agent</small></span>
+            <img class="product-icon" src="./assets/copilot-studio.svg" width="40" height="40" alt="">
+            <h3>Copilot Studio</h3><p>The agent consults<br>published supplier terms.</p>
+          </li>
+        </ol>
+        <figcaption>A2A means agent-to-agent communication. The answer returns to this chat with any sources and citations provided.</figcaption>
+      </figure>
+      <details class="access-path">
+        <summary>How this browser reaches the private agents</summary>
+        <p>The browser calls the AWS Lambda requester using HTTPS with JSON. Lambda sends A2A 1.0 messages through the Azure Functions Gateway to the private Foundry agent. Foundry also uses A2A 1.0 to call Copilot Studio.</p>
+        <p>Both A2A connections use JSON-RPC 2.0 over HTTPS. The Gateway preserves the A2A message through Foundry's HTTP passthrough, rather than converting it into a Responses API call.</p>
+        <p>Lambda and the Gateway provide access, not a separate conversational agent.</p>
+      </details>
+      <p class="diagram-note">Architecture overview, not a live execution trace. Actual sources and execution details appear with each response.</p>
     </section>
     </div>
   </main>

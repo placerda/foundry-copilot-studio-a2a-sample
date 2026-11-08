@@ -1,12 +1,12 @@
 import { Auth, signInErrorMessage } from "./auth.js";
-import { Conversation, makePayload } from "./conversation.js";
+import { Conversation } from "./conversation.js";
 import { renderMarkdown } from "./markdown.js";
-import { makeContosoPayload, validContoso, readResponse, CONTOSO_TIMEOUT_MS, LEGACY_TIMEOUT_MS,
-  nativeContosoOptions, NATIVE_CONTOSO_OPTIONS } from "./contoso.js";
+import { makeContosoPayload, validContoso, readResponse, CONTOSO_TIMEOUT_MS,
+  NATIVE_CONTOSO_OPTIONS } from "./contoso.js";
 
 const ui = Object.fromEntries(["error", "login", "logout", "reset", "send", "draft",
-  "messages", "processing", "auth-status", "chat-form", "contoso-controls", "network-mode",
-  "contoso-integration", "studio-variant", "empty-state", "start-hint"].map(id => [id, document.getElementById(id)]));
+  "messages", "processing", "auth-status", "chat-form",
+  "empty-state", "start-hint"].map(id => [id, document.getElementById(id)]));
 let auth;
 let config;
 let pending = false;
@@ -26,29 +26,28 @@ const statusMessages = {
 class RequestFailure extends Error {}
 
 function render() {
+  const contosoEnabled = config?.CONTOSO_ENABLED === true;
   ui.login.hidden = !!auth?.account;
   ui.logout.hidden = !auth?.account;
   ui.reset.hidden = !auth?.account;
   ui.login.disabled = !auth || !!auth.account || pending || signingOut;
   ui.logout.disabled = !auth?.account || signingOut;
   ui.reset.disabled = !auth?.account;
-  ui.send.disabled = !auth?.account || pending;
-  ui.draft.disabled = !auth?.account || pending;
+  ui.send.disabled = !auth?.account || !contosoEnabled || pending || signingOut;
+  ui.draft.disabled = ui.send.disabled;
   ui.processing.textContent = pending ? "Processing..." : "";
-  ui["auth-status"].textContent = auth?.account ? "Signed in." : "Sign in to chat.";
-  const contosoEnabled = config?.CONTOSO_ENABLED === true;
-  ui["contoso-controls"].hidden = !contosoEnabled;
-  ui["network-mode"].disabled = !contosoEnabled || !auth?.account || pending || signingOut;
-  const contosoSelected = contosoEnabled && ui["network-mode"].value === "contoso";
-  ui["contoso-integration"].disabled = !contosoSelected || !auth?.account || pending || signingOut;
-  ui["studio-variant"].disabled = ui["contoso-integration"].disabled;
+  ui["auth-status"].textContent = auth?.account
+    ? (contosoEnabled ? "Signed in." : "Agent network is not configured.")
+    : "Sign in to chat.";
   ui["empty-state"].hidden = conversation.confirmedPairs.length > 0;
-  ui["start-hint"].textContent = auth?.account
+  ui["start-hint"].textContent = !contosoEnabled
+    ? "Configure the A2A connection before starting a conversation."
+    : auth?.account
     ? "Choose a suggested question or write your own. Review the draft, then choose Send."
     : "Sign in with Microsoft to start. No question is sent until you choose Send.";
   ui.messages.setAttribute("aria-busy", String(pending));
   for (const button of document.querySelectorAll("[data-prompt]")) {
-    button.disabled = !auth?.account || pending || signingOut;
+    button.disabled = ui.send.disabled;
   }
 }
 
@@ -141,6 +140,9 @@ try {
   ({ default: config } = await import("./config.js"));
   auth = new Auth(config);
   await auth.initialize();
+  if (config.CONTOSO_ENABLED !== true) {
+    ui.error.textContent = "Agent network is not configured. Enable CONTOSO_ENABLED only after configuring the A2A connection.";
+  }
   render();
 } catch {
   auth = null;
@@ -160,20 +162,19 @@ ui.login.addEventListener("click", async () => {
 
 ui["chat-form"].addEventListener("submit", async event => {
   event.preventDefault();
-  if (!auth?.account || pending) return;
+  if (!auth?.account || pending || signingOut) return;
+  if (config.CONTOSO_ENABLED !== true) {
+    ui.error.textContent = "Only the configured A2A collaboration route is available. No request was sent.";
+    return;
+  }
   conversation.draft = ui.draft.value;
   const draft = conversation.draft;
   let payload;
-  const options = config.CONTOSO_ENABLED === true && ui["network-mode"].value === "contoso"
-    ? { integration: ui["contoso-integration"].value, studio_variant: ui["studio-variant"].value } : null;
+  const options = NATIVE_CONTOSO_OPTIONS;
   try {
-    if (options && !nativeContosoOptions(options)) throw new Error("Deferred agent route.");
-    payload = options ? makeContosoPayload(conversation.confirmedPairs, draft, options)
-      : makePayload(conversation.confirmedPairs, draft);
+    payload = makeContosoPayload(conversation.confirmedPairs, draft, options);
   } catch {
-    ui.error.textContent = options
-      ? "Enter a valid question of up to 2,000 characters within the byte limit."
-      : "Enter a valid message of up to 4,000 characters within the byte limit.";
+    ui.error.textContent = "Enter a valid question of up to 2,000 characters within the byte limit.";
     return;
   }
   pending = true;
@@ -185,7 +186,7 @@ ui["chat-form"].addEventListener("submit", async event => {
   let phase = "token";
   let timedOut = false;
   let timer;
-  const timeoutMs = options ? CONTOSO_TIMEOUT_MS : LEGACY_TIMEOUT_MS;
+  const timeoutMs = CONTOSO_TIMEOUT_MS;
   ui.error.textContent = "";
   render();
   try {
@@ -203,14 +204,14 @@ ui["chat-form"].addEventListener("submit", async event => {
       body: JSON.stringify(payload),
     });
     if (!response.ok) {
-      throw new RequestFailure(options && response.status === 502 ? "The agent network connection is unavailable."
+      throw new RequestFailure(response.status === 502 ? "The agent network connection is unavailable."
         : statusMessages[response.status] || "Unexpected service failure.");
     }
     phase = "response";
     if (!response.headers.get("content-type")?.toLowerCase().includes("application/json")) {
       throw new RequestFailure("Invalid response from the service.");
     }
-    const result = options ? await readResponse(response) : await response.json();
+    const result = await readResponse(response);
     if (!validResponse(result, options)) throw new RequestFailure("Invalid response from the service.");
     if (current() && conversation.confirm(generation, draft, result)) {
       append("user", draft);
@@ -245,29 +246,21 @@ ui["chat-form"].addEventListener("submit", async event => {
   }
 });
 
-function resetConversation(resetControls = true) {
+function resetConversation() {
   conversation.reset();
   ui.messages.replaceChildren();
   ui.draft.value = "";
   ui.error.textContent = "";
-  if (resetControls) {
-    ui["network-mode"].value = "legacy";
-    ui["contoso-integration"].value = NATIVE_CONTOSO_OPTIONS.integration;
-    ui["studio-variant"].value = NATIVE_CONTOSO_OPTIONS.studio_variant;
-  }
   render();
 }
 
 ui.reset.addEventListener("click", () => resetConversation());
 for (const button of document.querySelectorAll("[data-prompt]")) {
   button.addEventListener("click", () => {
-    if (!auth?.account || pending || signingOut) return;
+    if (ui.send.disabled) return;
     ui.draft.value = button.dataset.prompt;
     ui.draft.focus();
   });
-}
-for (const id of ["network-mode", "contoso-integration", "studio-variant"]) {
-  ui[id].addEventListener("change", () => resetConversation(false));
 }
 ui.logout.addEventListener("click", async () => {
   if (!auth?.account || signingOut) return;

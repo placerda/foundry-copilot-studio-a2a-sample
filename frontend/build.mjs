@@ -12,6 +12,7 @@ try {
 }
 const dist = path.join(root, "dist");
 await mkdir(dist, { recursive: true });
+await mkdir(path.join(dist, "assets"), { recursive: true });
 await build({
   entryPoints: [path.join(root, "app.js")],
   outfile: path.join(dist, "app.js"),
@@ -24,4 +25,7 @@ await build({
 });
 for (const name of ["index.html", "styles.css", "config.js"]) {
   await copyFile(path.join(root, name), path.join(dist, name));
+}
+for (const name of ["foundry.svg", "copilot-studio.svg"]) {
+  await copyFile(path.join(root, "assets", name), path.join(dist, "assets", name));
 }

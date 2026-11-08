@@ -24,7 +24,7 @@ const bundled = await build({
       }));
       builder.onLoad({ filter: /.*/, namespace: "fixture" }, () => ({
         contents: `export default { ...${JSON.stringify(testConfig)},
-          CONTOSO_ENABLED: Object.hasOwn(window, "contosoTestEnabled") ? window.contosoTestEnabled : false }`, loader: "js",
+          CONTOSO_ENABLED: Object.hasOwn(window, "contosoTestEnabled") ? window.contosoTestEnabled : true }`, loader: "js",
       }));
     },
   }],
@@ -43,7 +43,8 @@ http.createServer(async (request, response) => {
   }
   try {
     const content = await readFile(file);
-    response.setHeader("Content-Type", file.endsWith(".css") ? "text/css" : "text/html");
+    response.setHeader("Content-Type", file.endsWith(".css") ? "text/css"
+      : file.endsWith(".svg") ? "image/svg+xml" : "text/html");
     response.end(content);
   } catch {
     response.writeHead(404).end();

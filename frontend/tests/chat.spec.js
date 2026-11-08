@@ -1,5 +1,11 @@
 import { test, expect } from "@playwright/test";
 
+function result(answer, output_limited = false) {
+  return { answer, request_id: "test", output_limited,
+    contoso: { status: "no-matching-capability", provider_id: null, studio_variant: null,
+      sources: [], citations: [], execution_path: ["Synthetic test route without a knowledge provider"] } };
+}
+
 test.beforeEach(async ({ page }) => {
   await page.route("**/*", async route => {
     const url = new URL(route.request().url());
@@ -62,7 +68,7 @@ test("authorized text-only response and associated limit notice without continua
   await page.route("https://synthetic.lambda-url.us-east-2.on.aws/**", route => {
     calls++;
     expect(route.request().headers().authorization).toBe("Bearer synthetic-access-token");
-    return route.fulfill({ json: { answer: "<img src=x onerror=alert(1)>", request_id: "test", output_limited: true } });
+    return route.fulfill({ json: result("<img src=x onerror=alert(1)>", true) });
   });
   await login(page);
   await page.locator("#draft").fill("Olá");
@@ -102,7 +108,7 @@ test("context remains in memory, notices stay on their message and reset/reload 
   const requests = [];
   await page.route("https://synthetic.lambda-url.us-east-2.on.aws/**", route => {
     requests.push(route.request().postDataJSON());
-    return route.fulfill({ json: { answer: "memory-answer", request_id: "test", output_limited: requests.length === 1 } });
+    return route.fulfill({ json: result("memory-answer", requests.length === 1) });
   });
   await login(page);
   for (const draft of ["memory-sentinel", "followup"]) {
@@ -111,6 +117,7 @@ test("context remains in memory, notices stay on their message and reset/reload 
     await expect(page.locator("#processing")).toBeEmpty();
   }
   expect(requests[1].messages.map(message => message.content)).toEqual(["memory-sentinel", "memory-answer", "followup"]);
+  expect(requests.every(request => request.contoso_options.integration === "a2a")).toBe(true);
   expect(JSON.stringify(requests[1])).not.toContain("output_limited");
   await expect(page.locator(".limit")).toHaveCount(1);
   expect(await page.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }))).not.toContain("memory-sentinel");
@@ -126,7 +133,7 @@ test("reset during token await retains lock and prevents late POST", async ({ pa
   let calls = 0;
   await page.route("https://synthetic.lambda-url.us-east-2.on.aws/**", route => {
     calls++;
-    return route.fulfill({ json: { answer: "late", request_id: "test", output_limited: true } });
+    return route.fulfill({ json: result("late", true) });
   });
   await login(page);
   await page.evaluate(() => { window.tokenDelay = 600; });
@@ -146,7 +153,7 @@ test("late limited HTTP response cannot restore reset conversation", async ({ pa
   await page.route("https://synthetic.lambda-url.us-east-2.on.aws/**", async route => {
     started();
     await new Promise(resolve => setTimeout(resolve, 400));
-    await route.fulfill({ json: { answer: "late", request_id: "test", output_limited: true } }).catch(() => {});
+    await route.fulfill({ json: result("late", true) }).catch(() => {});
   });
   await login(page);
   await page.locator("#draft").fill("old");
@@ -160,7 +167,7 @@ test("late limited HTTP response cannot restore reset conversation", async ({ pa
 
 test("logout clears local state even if provider popup fails", async ({ page }) => {
   await page.route("https://synthetic.lambda-url.us-east-2.on.aws/**", route =>
-    route.fulfill({ json: { answer: "reply", request_id: "test", output_limited: true } }));
+    route.fulfill({ json: result("reply", true) }));
   await login(page);
   await page.locator("#draft").fill("secret-in-memory");
   await page.locator("#send").click();
@@ -175,7 +182,7 @@ test("logout clears local state even if provider popup fails", async ({ page }) 
 
 for (const [status, hint] of [[400, "Invalid message"], [401, "Invalid or expired session"],
   [403, "does not have access"], [405, "does not support this method"],
-  [429, "busy"], [500, "Internal service error"], [502, "temporarily unavailable"]]) {
+  [429, "busy"], [500, "Internal service error"], [502, "connection is unavailable"]]) {
   test(`friendly ${status} platform error keeps draft and no retry`, async ({ page }) => {
     let calls = 0;
     await page.route("https://synthetic.lambda-url.us-east-2.on.aws/**", route => {
@@ -197,7 +204,7 @@ test("ten submits during silent renewal produce one POST and interaction only wh
   let calls = 0;
   await page.route("https://synthetic.lambda-url.us-east-2.on.aws/**", route => {
     calls++;
-    return route.fulfill({ json: { answer: "ok", request_id: "id", output_limited: false } });
+    return route.fulfill({ json: result("ok") });
   });
   await login(page);
   await page.evaluate(() => { window.tokenDelay = 400; window.interactionRequired = true; });
@@ -223,7 +230,7 @@ test("unrelated token failure never falls back to popup or sends POST", async ({
   expect(await page.evaluate(() => window.popupCalls || 0)).toBe(0);
 });
 
-test("35 second wait timeout has uncertain outcome and manual retry only", async ({ page }) => {
+test("100 second collaboration timeout has uncertain outcome and manual retry only", async ({ page }) => {
   await page.clock.install();
   let calls = 0;
   let requestStarted;
@@ -236,8 +243,8 @@ test("35 second wait timeout has uncertain outcome and manual retry only", async
   await page.locator("#draft").fill("uncertain");
   await page.locator("#send").click();
   await started;
-  await page.clock.fastForward(35001);
-  await expect(page.locator("#error")).toContainText("35 seconds");
+  await page.clock.fastForward(100001);
+  await expect(page.locator("#error")).toContainText("100 seconds");
   await expect(page.locator("#error")).toContainText("may continue");
   await expect(page.locator("#send")).toBeEnabled();
   await expect(page.locator("#draft")).toHaveValue("uncertain");

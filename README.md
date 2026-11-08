@@ -14,7 +14,11 @@ Read the numbered stages from left to right: **1** approved client, **2** authen
 
 **Request path:** client → authenticated gateway → private Foundry Hosted agent → Copilot Studio A2A endpoint. Responses return through the same chain. An AWS Lambda requester is included only as an optional external-client example, not a requirement for the Foundry–Copilot Studio integration.
 
-The optional browser frontend can be served locally. It is a client of the Lambda requester, not a locally hosted agent. The chat keeps the conversation prominent. Expand **Delivery proposal** for the synthetic context or **Connection settings** for explicit routing controls. Session actions appear after sign-in. Authentication and conversation data remain in page memory.
+The optional browser frontend can be served locally. It is a client of the Lambda requester, not a locally hosted agent. The chat keeps the conversation prominent. Expand **Delivery proposal** for the synthetic context. Below the conversation, **How the agents collaborate** explains the Foundry–Copilot Studio A2A connection with a high-level diagram and collapsed access-path details. There are no mode, integration or agent selectors, and no standalone Nova chat option.
+
+The frontend always uses the native A2A / Copilot Harness route. Configure the connection and set `CONTOSO_ENABLED: true` before using the chat. A disabled connection or invalid response never falls back to an AWS model. Reset and sign-out preserve the fixed route. Lambda remains an access bridge, not a separate conversational agent. Existing backend resources are not deleted by this frontend change. Session actions appear after sign-in. Authentication and conversation data remain in page memory.
+
+The diagram uses unmodified official Microsoft Azure and Power Platform product icons stored locally. It labels browser-to-Lambda traffic as HTTPS/JSON and both Lambda-to-Foundry (via the Azure Functions Gateway) and Foundry-to-Copilot Studio traffic as A2A 1.0. Both A2A connections use JSON-RPC 2.0 over HTTPS, with protocol-preserving Foundry HTTP passthrough.
 
 ## Detailed connectivity
 
