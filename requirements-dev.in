@@ -1,0 +1,7 @@
+-r contoso/requirements.in
+-r contoso_backend/requirements.in
+pytest>=8,<10
+pytest-cov>=6,<8
+jsonschema>=4.23,<5
+PyYAML>=6,<7
+dnslib>=0.9.26,<1

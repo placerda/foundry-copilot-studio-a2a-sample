@@ -1,0 +1,122 @@
+name: contoso-private-network
+requiredVersions:
+  azd: ">=1.36.0"
+  extensions:
+    azure.ai.agents: ">=1.0.0-beta.20"
+    azure.ai.projects: ">=1.0.0-beta.14"
+services:
+  contoso-knowledge-agent:
+    host: azure.ai.agent
+    project: .
+    language: docker
+    kind: hosted
+    name: contoso-knowledge-agent
+    description: Extracts one approved version-pinned fictional knowledge document.
+    image: ${CONTOSO_RUNTIME_IMAGE}
+    docker:
+      imagePassthrough: true
+      remoteBuild: false
+    protocols:
+      - protocol: responses
+        version: 2.0.0
+    agentEndpoint:
+      protocols: [responses, a2a]
+    agentCard:
+      description: Retrieves the approved synthetic returnable-packaging demo source.
+      version: "1.0"
+      skills:
+        - id: knowledge-knowledge
+          name: Approved packaging demonstration knowledge
+          description: Returns the fictional returnable-packaging intervention and its evidence limits for the registered question.
+    env:
+      PYTHONNOUSERSITE: "1"
+      CONTOSO_RUNTIME_ROLE: ${CONTOSO_KNOWLEDGE_RUNTIME_ROLE}
+      CONTOSO_SOURCE_BLOB_ENDPOINT: ${CONTOSO_SOURCE_BLOB_ENDPOINT}
+      CONTOSO_KNOWLEDGE_SOURCE_SHA256: ${CONTOSO_KNOWLEDGE_SOURCE_SHA256}
+      CONTOSO_PLATFORM_CALLER_IDS: ${CONTOSO_KNOWLEDGE_PLATFORM_CALLER_IDS}
+    container:
+      resources:
+        cpu: "0.25"
+        memory: 0.5Gi
+  contoso-foundry-sdk-agent:
+    host: azure.ai.agent
+    project: .
+    language: docker
+    kind: hosted
+    name: contoso-foundry-sdk-agent
+    description: Routes registered synthetic Contoso questions to authenticated approved knowledge providers.
+    image: ${CONTOSO_RUNTIME_IMAGE}
+    docker:
+      imagePassthrough: true
+      remoteBuild: false
+    protocols:
+      - protocol: responses
+        version: 2.0.0
+    agentEndpoint:
+      protocols: [responses, a2a]
+    agentCard:
+      description: Routes the four registered demo questions using the approved capability catalog.
+      version: "1.0"
+      skills:
+        - id: contoso-catalog-routing
+          name: Registered Contoso demo routing
+          description: Selects the approved Knowledge or Copilot Studio agent, preserves source attribution, and returns an explicit no-match for the registered unsupported capability.
+    env:
+      PYTHONNOUSERSITE: "1"
+      CONTOSO_RUNTIME_ROLE: ${CONTOSO_ROUTER_RUNTIME_ROLE}
+      CONTOSO_ROUTER_SCOPE: ${CONTOSO_ROUTER_SCOPE}
+      CONTOSO_ENTRA_TENANT_ID: ${CONTOSO_ENTRA_TENANT_ID}
+      CONTOSO_STUDIO_ENVIRONMENT_ID: ${CONTOSO_STUDIO_ENVIRONMENT_ID}
+      CONTOSO_STUDIO_STANDARD_SCHEMA: ${CONTOSO_STUDIO_STANDARD_SCHEMA}
+      CONTOSO_STUDIO_HARNESS_ENDPOINT: ${CONTOSO_STUDIO_HARNESS_ENDPOINT}
+      CONTOSO_KNOWLEDGE_A2A_ENDPOINT: ${CONTOSO_KNOWLEDGE_A2A_ENDPOINT}
+      CONTOSO_GATEWAY_URL: ${CONTOSO_GATEWAY_URL}
+      CONTOSO_ENTRA_API_CLIENT_ID: ${CONTOSO_ENTRA_API_CLIENT_ID}
+      CONTOSO_PLATFORM_CALLER_IDS: ${CONTOSO_ROUTER_PLATFORM_CALLER_IDS}
+    container:
+      resources:
+        cpu: "0.25"
+        memory: 0.5Gi
+  contoso-foundry-agent:
+    host: azure.ai.agent
+    project: .
+    language: docker
+    kind: hosted
+    name: contoso-foundry-agent
+    description: Routes registered synthetic Contoso questions to authenticated approved knowledge providers.
+    image: ${CONTOSO_RUNTIME_IMAGE}
+    docker:
+      imagePassthrough: true
+      remoteBuild: false
+    protocols:
+      - protocol: responses
+        version: 2.0.0
+      - protocol: a2a
+        version: 1.0.0
+      - protocol: invocations
+        version: 2.0.0
+    agentEndpoint:
+      protocols: [responses, a2a, invocations]
+    agentCard:
+      description: Routes the four registered demo questions using the approved capability catalog.
+      version: "1.0"
+      skills:
+        - id: contoso-catalog-routing
+          name: Registered Contoso demo routing
+          description: Selects the approved Knowledge or Copilot Studio agent, preserves source attribution, and returns an explicit no-match for the registered unsupported capability.
+    env:
+      PYTHONNOUSERSITE: "1"
+      CONTOSO_RUNTIME_ROLE: ${CONTOSO_ROUTER_RUNTIME_ROLE}
+      CONTOSO_ROUTER_SCOPE: ${CONTOSO_ROUTER_SCOPE}
+      CONTOSO_ENTRA_TENANT_ID: ${CONTOSO_ENTRA_TENANT_ID}
+      CONTOSO_STUDIO_ENVIRONMENT_ID: ${CONTOSO_STUDIO_ENVIRONMENT_ID}
+      CONTOSO_STUDIO_STANDARD_SCHEMA: ${CONTOSO_STUDIO_STANDARD_SCHEMA}
+      CONTOSO_STUDIO_HARNESS_ENDPOINT: ${CONTOSO_STUDIO_HARNESS_ENDPOINT}
+      CONTOSO_KNOWLEDGE_A2A_ENDPOINT: ${CONTOSO_KNOWLEDGE_A2A_ENDPOINT}
+      CONTOSO_GATEWAY_URL: ${CONTOSO_GATEWAY_URL}
+      CONTOSO_ENTRA_API_CLIENT_ID: ${CONTOSO_ENTRA_API_CLIENT_ID}
+      CONTOSO_PLATFORM_CALLER_IDS: ${CONTOSO_ROUTER_PLATFORM_CALLER_IDS}
+    container:
+      resources:
+        cpu: "0.25"
+        memory: 0.5Gi

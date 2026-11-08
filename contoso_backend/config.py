@@ -1,0 +1,96 @@
+import os
+import re
+from dataclasses import dataclass, field
+from urllib.parse import urlsplit
+from uuid import UUID
+
+
+MAX_BODY_BYTES = 32768
+MAX_CONTENT_LENGTH = 4000
+CONTOSO_DEADLINE_SECONDS = 75
+CONTOSO_MIN_REMAINING_MS = 80000
+
+
+def gateway_endpoint(value, endpoint_path="/api/invoke"):
+    if endpoint_path not in ("/api/invoke", "/api/a2a"):
+        raise ValueError
+    if (not isinstance(value, str) or len(value) > 256
+            or any(c.isspace() or ord(c) < 32 for c in value)
+            or any(c in value for c in ("\\", "?", "#", "%"))):
+        raise ValueError
+    parsed = urlsplit(value)
+    if (parsed.scheme != "https" or parsed.username is not None or parsed.password is not None
+            or parsed.port is not None or parsed.path not in ("", "/", endpoint_path)
+            or not re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?"
+                               r"(?:\.[a-z0-9-]+)*\.azurewebsites\.net", parsed.netloc)):
+        raise ValueError
+    return f"https://{parsed.netloc}{endpoint_path}"
+
+
+@dataclass(frozen=True)
+class CONTOSOSettings:
+    gateway_url: str
+    tenant_id: str
+    gateway_api_client_id: str
+    requester_client_id: str
+    requester_client_secret: str = field(repr=False)
+    a2a_gateway_url: str | None = None
+
+    @classmethod
+    def from_env(cls, env):
+        try:
+            raw_gateway = env["CONTOSO_GATEWAY_URL"]
+            path = urlsplit(raw_gateway).path
+            gateway = gateway_endpoint(raw_gateway, "/api/a2a" if path == "/api/a2a" else "/api/invoke")
+            a2a_gateway = (gateway_endpoint(raw_gateway, "/api/a2a")
+                           if path != "/api/invoke" else None)
+            ids = [str(UUID(env[name])) for name in (
+                "CONTOSO_ENTRA_TENANT_ID", "CONTOSO_GATEWAY_API_CLIENT_ID", "CONTOSO_REQUESTER_CLIENT_ID")]
+            secret = env["CONTOSO_REQUESTER_CLIENT_SECRET"]
+            if (not isinstance(secret, str) or not secret.strip() or len(secret) > 4096
+                    or any(ord(c) < 32 for c in secret)):
+                raise ValueError
+        except (KeyError, ValueError, TypeError, AttributeError):
+            raise ValueError("Invalid CONTOSO configuration") from None
+        return cls(gateway, *ids, secret, a2a_gateway_url=a2a_gateway)
+
+
+@dataclass(frozen=True)
+class Settings:
+    tenant_id: str
+    audience: str
+    owner_oid: str
+    region: str = "us-east-2"
+    model_id: str = "amazon.nova-lite-v1:0"
+    scope: str = "access_as_user"
+    max_messages: int = 10
+    max_output_tokens: int = 400
+    contoso: CONTOSOSettings | None = None
+
+    @property
+    def issuer(self):
+        return f"https://login.microsoftonline.com/{self.tenant_id}/v2.0"
+
+    @classmethod
+    def from_env(cls, environment=None):
+        env = os.environ if environment is None else environment
+        try:
+            ids = [str(UUID(env[name])) for name in
+                   ("TENANT_ID", "API_AUDIENCE", "ALLOWED_USER_OID")]
+            region = env.get("AWS_REGION", "us-east-2")
+            model = env.get("BEDROCK_MODEL_ID", "amazon.nova-lite-v1:0")
+            scope = env.get("REQUIRED_SCOPE", "access_as_user")
+            count = int(env.get("MAX_MESSAGES", "10"))
+            tokens = int(env.get("MAX_OUTPUT_TOKENS", "400"))
+            contoso_enabled = env.get("CONTOSO_ENABLED", "false")
+            if contoso_enabled not in ("true", "false"):
+                raise ValueError
+            contoso = CONTOSOSettings.from_env(env) if contoso_enabled == "true" else None
+            if (region != "us-east-2" or count < 1 or tokens < 1
+                    or not re.fullmatch(r"amazon\.nova-lite-v1:0", model)
+                    or not re.fullmatch(r"[A-Za-z0-9_.-]+", scope)):
+                raise ValueError
+        except (KeyError, ValueError, TypeError, AttributeError):
+            raise ValueError("Invalid service configuration") from None
+        return cls(*ids, region=region, model_id=model, scope=scope,
+                   max_messages=count, max_output_tokens=tokens, contoso=contoso)

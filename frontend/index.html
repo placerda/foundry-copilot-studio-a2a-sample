@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Supplier–Buyer Agent Collaboration</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <!-- Operate: a Fluent-inspired workspace for comparing a synthetic request with a supplier proposal.
+       Light neutral surfaces, Segoe UI, restrained Microsoft blue. Context precedes the conversation;
+       identity and routing stay explicit, and only returned evidence is shown as an agent result. -->
+  <header class="app-header">
+    <a class="brand" href="./" aria-label="Supplier–Buyer Agent Collaboration home">
+      <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+      <span>Agent collaboration</span>
+    </a>
+    <nav aria-label="Session">
+      <button id="login" disabled>Sign in with Microsoft</button>
+      <button id="reset" disabled>New conversation</button>
+      <button id="logout" disabled>Sign out</button>
+    </nav>
+  </header>
+  <main>
+    <section class="page-heading">
+      <div><h1>Supplier–Buyer Agent Collaboration</h1>
+        <p>Explore a delivery proposal against the buyer’s terms, with evidence from the agent response.</p>
+      </div>
+      <span class="demo-label">Synthetic demonstration</span>
+    </section>
+    <div class="workspace">
+    <aside class="context-panel" aria-label="Demonstration context">
+      <h2>Delivery proposal</h2>
+      <p class="context-intro">Illustrative context only. Not a live order, inventory check, or approval.</p>
+      <div class="order-comparison">
+        <section><h3>Original buyer request</h3><p class="quantity">500 <span>units</span></p><p>Delivery due <b>Friday</b></p></section>
+        <div class="comparison-divider" aria-hidden="true">↓</div>
+        <section><h3>Supplier proposal</h3><dl><div><dt>Friday</dt><dd>300 units</dd></div><div><dt>Monday</dt><dd>200 units</dd></div></dl></section>
+      </div>
+      <p class="context-question">Does this partial delivery satisfy the buyer’s terms?</p>
+      <section class="evidence-note"><h3>Keep the decision grounded</h3><p>Ask about conditions and evidence limits. A response is not authorization to change an order or approve a delivery.</p></section>
+      <details id="contoso-controls" hidden open>
+      <summary>Connection settings</summary>
+      <fieldset><legend>Network routing</legend>
+      <label for="network-mode">Network mode</label>
+      <select id="network-mode" disabled>
+        <option value="legacy">Contoso AWS Agent (Nova)</option>
+        <option value="contoso">Contoso Agent Network (A2A)</option>
+      </select>
+      <label for="contoso-integration">Gateway integration</label>
+      <select id="contoso-integration" disabled>
+        <option value="a2a" selected>A2A</option>
+        <option value="sdk" disabled hidden>Responses SDK — deferred</option>
+      </select>
+      <label for="studio-variant">Copilot Studio agent</label>
+      <select id="studio-variant" disabled>
+        <option value="copilot-harness" selected>Contoso Copilot Studio Agent</option>
+        <option value="standard" disabled hidden>Standard — deferred</option>
+      </select>
+      <p class="route-note">Required route: Contoso AWS Agent → A2A → Contoso Foundry Agent → Contoso Copilot Studio Agent.
+        Enable the agent network only after this route is verified live. It sends only your latest question.
+        Source attribution and execution traces below come from the actual response, not these selections.</p>
+      </fieldset>
+      </details>
+    </aside>
+    <section class="chat-panel" aria-label="Collaboration workspace">
+      <header class="chat-heading"><div><h2>Conversation</h2><p>This conversation is stored only in this page's memory.</p></div>
+        <p id="auth-status" role="status">Initializing authentication...</p>
+      </header>
+      <div class="conversation-body">
+        <section id="empty-state" class="empty-state" aria-label="Start a conversation">
+          <span class="conversation-symbol" aria-hidden="true">↔</span>
+          <h3>Bring the proposal to the buyer</h3>
+          <p>Ask whether the proposed split meets the terms, then inspect the returned sources and evidence limits.</p>
+          <p id="start-hint">Sign in with Microsoft to start. No question is sent until you choose Send.</p>
+          <div class="suggestions" aria-label="Suggested questions">
+            <button type="button" data-prompt="We have an order for 500 units due Friday. We propose delivering 300 units Friday and 200 units Monday. Does this partial delivery satisfy the buyer's terms?"><span>Evaluate the delivery proposal</span><span aria-hidden="true">↗</span></button>
+            <button type="button" data-prompt="What conditions apply to the supplier's proposal to deliver 300 of 500 units Friday and the remaining 200 Monday, and what are the evidence limits?"><span>Check conditions and evidence limits</span><span aria-hidden="true">↗</span></button>
+            <button type="button" data-prompt="Approve the supplier's proposal to deliver 300 of 500 units Friday and the remaining 200 Monday."><span>Explore an unsupported approval request</span><span aria-hidden="true">↗</span></button>
+          </div>
+          <p class="suggestion-note">Suggestions fill your draft; they do not imply a supported capability or a successful outcome.</p>
+        </section>
+        <section id="messages" aria-label="Messages" aria-live="polite" aria-relevant="additions"></section>
+      </div>
+    <div class="composer">
+    <p id="processing" role="status"></p>
+    <p id="error" role="alert"></p>
+    <form id="chat-form">
+      <label for="draft">Your message</label>
+      <textarea id="draft" rows="3" placeholder="Ask about the delivery proposal…" aria-describedby="composer-hint" disabled></textarea>
+      <div class="composer-actions"><p id="composer-hint">Review answers and sources before making a business decision.</p><button id="send" disabled>Send</button></div>
+    </form>
+    </div>
+    </section>
+    </div>
+  </main>
+  <script type="module">
+    const authReturn = /(?:^#|&)(?:code|error)=/.test(window.location.hash);
+    if (window === window.top && !(window.opener && authReturn)) {
+      await import("./app.js");
+    }
+  </script>
+</body>
+</html>

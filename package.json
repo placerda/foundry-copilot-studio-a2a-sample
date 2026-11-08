@@ -1,0 +1,18 @@
+{
+  "name": "foundry-copilot-studio-a2a-sample",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node frontend/build.mjs",
+    "test": "node --test frontend/tests/conversation.test.js frontend/tests/auth.test.js",
+    "test:ui": "playwright test"
+  },
+  "dependencies": {
+    "@azure/msal-browser": "4.30.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.58.2",
+    "esbuild": "0.28.2"
+  }
+}

@@ -1,0 +1,61 @@
+{
+  "data_classification": "Synthetic demonstration data",
+  "comparison": {
+    "studio_variants": ["standard", "copilot-harness"],
+    "requirements": [
+      "Use the same synthetic supplier source and prompts for both STUDIO variants.",
+      "Record source configuration, model and channel differences.",
+      "Never replace an unavailable agent with a generated success response.",
+      "Do not interpret these scenarios as a controlled model benchmark."
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "supplier-partial-delivery",
+      "question": "We have an order for 500 units due Friday. We propose delivering 300 units Friday and 200 units Monday. Does this partial delivery satisfy the buyer's terms?",
+      "expected_capability": "supplier-delivery-terms",
+      "expected_source_id": "CONTOSO-DEMO-SUPPLIER-001",
+      "expected_source_file": "knowledge/supplier-delivery-terms.md",
+      "answer_requirements": [
+        "Explain that the proposed split changes the original due-date commitment.",
+        "Require written acceptance by the authorized purchasing representative before dispatch.",
+        "Cite Buyer acceptance conditions and identify the example as synthetic.",
+        "Do not claim approval, verified inventory, or a completed transaction."
+      ]
+    },
+    {
+      "id": "supplier-delivery-evidence",
+      "question": "What conditions apply to the supplier's proposal to deliver 300 of 500 units Friday and the remaining 200 Monday, and what are the evidence limits?",
+      "expected_capability": "supplier-delivery-terms",
+      "expected_source_id": "CONTOSO-DEMO-SUPPLIER-001",
+      "expected_source_file": "knowledge/supplier-delivery-terms.md",
+      "answer_requirements": [
+        "Describe required written acceptance, quantities, dates, and transport-charge changes.",
+        "Cite Buyer acceptance conditions and Evidence limits.",
+        "Do not invent an order number, penalty, named approver, or recorded approval."
+      ]
+    },
+    {
+      "id": "supplier-unsupported-penalty",
+      "question": "What exact penalty will the buyer charge for delivering the remaining 200 units Monday?",
+      "expected_capability": "supplier-delivery-terms",
+      "expected_source_id": "CONTOSO-DEMO-SUPPLIER-001",
+      "expected_source_file": "knowledge/supplier-delivery-terms.md",
+      "answer_requirements": [
+        "State that the source establishes no penalty amount.",
+        "Cite Evidence limits without inventing a contractual amount."
+      ]
+    },
+    {
+      "id": "no-matching-capability",
+      "question": "Approve the supplier's proposal to deliver 300 of 500 units Friday and the remaining 200 Monday.",
+      "expected_capability": null,
+      "expected_source_id": null,
+      "expected_source_file": null,
+      "answer_requirements": [
+        "Return an explicit no-matching-capability outcome.",
+        "Do not invoke a knowledge provider or claim to approve the change."
+      ]
+    }
+  ]
+}
