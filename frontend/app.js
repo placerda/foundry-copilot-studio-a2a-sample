@@ -26,6 +26,9 @@ const statusMessages = {
 class RequestFailure extends Error {}
 
 function render() {
+  ui.login.hidden = !!auth?.account;
+  ui.logout.hidden = !auth?.account;
+  ui.reset.hidden = !auth?.account;
   ui.login.disabled = !auth || !!auth.account || pending || signingOut;
   ui.logout.disabled = !auth?.account || signingOut;
   ui.reset.disabled = !auth?.account;

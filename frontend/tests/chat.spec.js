@@ -35,13 +35,15 @@ test("application labels and session states are in English", async ({ page }) =>
   await expect(page.getByRole("heading", { name: "Supplier–Buyer Agent Collaboration" })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "Session" })).toBeVisible();
   await expect(page.getByRole("region", { name: "Messages" })).toBeAttached();
-  await expect(page.getByRole("button", { name: "New conversation" })).toBeDisabled();
-  await expect(page.getByRole("button", { name: "Sign out" })).toBeDisabled();
+  await expect(page.locator("#reset")).toBeHidden();
+  await expect(page.locator("#logout")).toBeHidden();
   await expect(page.getByLabel("Your message")).toBeDisabled();
   await expect(page.getByRole("button", { name: "Send", exact: true })).toBeDisabled();
   await expect(page.locator("#auth-status")).toHaveText("Sign in to chat.");
   await page.getByRole("button", { name: "Sign in with Microsoft" }).click();
   await expect(page.locator("#auth-status")).toHaveText("Signed in.");
+  await expect(page.getByRole("button", { name: "New conversation" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Sign out" })).toBeEnabled();
 });
 
 test("root OAuth return in popup leaves hash intact and does not initialize MSAL", async ({ page }) => {

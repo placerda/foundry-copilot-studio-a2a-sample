@@ -14,6 +14,8 @@ Read the numbered stages from left to right: **1** approved client, **2** authen
 
 **Request path:** client → authenticated gateway → private Foundry Hosted agent → Copilot Studio A2A endpoint. Responses return through the same chain. An AWS Lambda requester is included only as an optional external-client example, not a requirement for the Foundry–Copilot Studio integration.
 
+The optional browser frontend can be served locally. It is a client of the Lambda requester, not a locally hosted agent. The chat keeps the conversation prominent. Expand **Delivery proposal** for the synthetic context or **Connection settings** for explicit routing controls. Session actions appear after sign-in. Authentication and conversation data remain in page memory.
+
 ## Detailed connectivity
 
 ![Complete connectivity architecture](docs/architecture.svg)

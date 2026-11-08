@@ -29,12 +29,23 @@ for (const [device, size] of [["desktop", { width: 1440, height: 1000 }], ["mobi
     await page.setViewportSize(size);
     await page.addInitScript(() => { window.contosoTestEnabled = true; });
     await page.goto("/");
+    await expect(page.locator("#delivery-context")).not.toHaveAttribute("open", "");
+    await expect(page.locator("#contoso-controls")).not.toHaveAttribute("open", "");
+    await expect(page.locator("#reset")).toBeHidden();
+    await expect(page.locator("#logout")).toBeHidden();
+    await expect(page.getByRole("heading", { name: "Original buyer request" })).toBeHidden();
+    await page.screenshot({ path: `${evidence}/${device}-signed-out.png`, fullPage: true });
+    await page.locator("#delivery-context > summary").click();
     await expect(page.getByRole("heading", { name: "Original buyer request" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Supplier proposal", exact: true })).toBeVisible();
     await expect(page.getByText("Illustrative context only.", { exact: false })).toBeVisible();
     await expect(page.getByRole("button", { name: "Evaluate the delivery proposal" })).toBeDisabled();
-    await page.screenshot({ path: `${evidence}/${device}-signed-out.png`, fullPage: true });
+    await page.locator("#delivery-context > summary").click();
     await page.locator("#login").click();
+    await expect(page.locator("#login")).toBeHidden();
+    await expect(page.locator("#reset")).toBeVisible();
+    await expect(page.locator("#logout")).toBeVisible();
+    await page.locator("#contoso-controls > summary").click();
     await page.getByLabel("Network mode").selectOption("contoso");
     let payload;
     await page.route(functionURL, route => {

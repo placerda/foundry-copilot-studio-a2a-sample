@@ -17,8 +17,8 @@
     </a>
     <nav aria-label="Session">
       <button id="login" disabled>Sign in with Microsoft</button>
-      <button id="reset" disabled>New conversation</button>
-      <button id="logout" disabled>Sign out</button>
+      <button id="reset" hidden disabled>New conversation</button>
+      <button id="logout" hidden disabled>Sign out</button>
     </nav>
   </header>
   <main>
@@ -30,7 +30,9 @@
     </section>
     <div class="workspace">
     <aside class="context-panel" aria-label="Demonstration context">
-      <h2>Delivery proposal</h2>
+      <details id="delivery-context">
+      <summary><span>Delivery proposal</span><span class="context-summary">500 units · 300 Friday / 200 Monday</span></summary>
+      <div class="context-content">
       <p class="context-intro">Illustrative context only. Not a live order, inventory check, or approval.</p>
       <div class="order-comparison">
         <section><h3>Original buyer request</h3><p class="quantity">500 <span>units</span></p><p>Delivery due <b>Friday</b></p></section>
@@ -39,7 +41,9 @@
       </div>
       <p class="context-question">Does this partial delivery satisfy the buyer’s terms?</p>
       <section class="evidence-note"><h3>Keep the decision grounded</h3><p>Ask about conditions and evidence limits. A response is not authorization to change an order or approve a delivery.</p></section>
-      <details id="contoso-controls" hidden open>
+      </div>
+      </details>
+      <details id="contoso-controls" hidden>
       <summary>Connection settings</summary>
       <fieldset><legend>Network routing</legend>
       <label for="network-mode">Network mode</label>

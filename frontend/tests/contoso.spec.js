@@ -26,6 +26,7 @@ async function loginContoso(page, flag = true) {
   await expect(page.getByLabel("Network mode")).toBeDisabled();
   await page.locator("#login").click();
   await expect(page.locator("#draft")).toBeEnabled();
+  await page.locator("#contoso-controls > summary").click();
   await page.getByLabel("Network mode").selectOption("contoso");
 }
 
