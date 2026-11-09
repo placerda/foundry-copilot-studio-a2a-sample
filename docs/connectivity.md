@@ -1,5 +1,11 @@
 # Supplier–Buyer Agent Collaboration: connectivity
 
+The current local client and target APIM path are described in
+[README](../README.md) and the architecture diagrams. The stages below retain
+the previously validated Function reference until real APIM cutover acceptance.
+The identity selector defaults to the fixed shared delegated connection;
+automatic user delegation and SDK S2S remain disabled, not working paths.
+
 The main integration direction is **Microsoft Foundry → Copilot Studio through A2A**. There is no reverse Studio-to-Foundry trigger, Power Automate flow, or Microsoft 365 channel in this implementation.
 
 The [four synthetic B2B scenarios](../contoso-demo/scenarios.json) use the `supplier-delivery-terms` capability and [versioned supplier source](../contoso-demo/knowledge/supplier-delivery-terms.md). The approval request has no matching capability: it must not invoke a provider or claim a buyer approval. Source attribution and authorization are preserved across the same numbered stages **1–4** shown in the [overview](architecture-overview.svg) and [detailed diagram](architecture.svg). The agents explain conditions; they do not create orders or dispatch goods.

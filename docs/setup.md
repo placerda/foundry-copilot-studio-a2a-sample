@@ -1,5 +1,12 @@
 # Setup guide
 
+For the current AWS-free local client, follow the Windows startup instructions
+in [README](../README.md) first. This guide's cloud deployment steps describe
+the retained Function reference, not a completed APIM cutover. APIM networking,
+protected OAuth broker/consent, and OBO/SDK feasibility still require validation.
+Do not delete the Function or its private operator duties on the strength of
+the local client or disabled identity choices.
+
 This sample preserves a working reference implementation. You must supply your own resource names, identities, permissions, consent, and publication bindings. It does not include existing cloud resources or the private deployment's operating history.
 
 ## Prerequisites

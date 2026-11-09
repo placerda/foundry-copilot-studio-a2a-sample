@@ -8,7 +8,7 @@ const testConfig = {
   TENANT_ID: "11111111-1111-1111-1111-111111111111",
   SPA_CLIENT_ID: "22222222-2222-2222-2222-222222222222",
   API_SCOPE: "api://33333333-3333-3333-3333-333333333333/access_as_user",
-  FUNCTION_URL: "https://synthetic.lambda-url.us-east-2.on.aws/",
+  API_URL: "/api/chat",
   REDIRECT_URI: "http://localhost:8000/",
 };
 const bundled = await build({
@@ -31,6 +31,15 @@ const bundled = await build({
 });
 http.createServer(async (request, response) => {
   const name = new URL(request.url, "http://localhost").pathname;
+  if (name === "/api/capabilities") {
+    response.setHeader("Content-Type", "application/json");
+    response.end(JSON.stringify({ default: "shared-delegated", modes: {
+      "user-delegation": { enabled: false, reason: "Not configured." },
+      "service-to-service": { enabled: false, reason: "Not configured." },
+      "shared-delegated": { enabled: true, reason: "Shared connection selected." },
+    } }));
+    return;
+  }
   if (name === "/app.js") {
     response.setHeader("Content-Type", "text/javascript");
     response.end(bundled.outputFiles[0].text);

@@ -1,0 +1,133 @@
+<policies>
+  <inbound>
+    <base />
+    <validate-jwt id="caller-jwt" header-name="Authorization" require-scheme="Bearer"
+                  require-signed-tokens="true" require-expiration-time="true"
+                  clock-skew="30" failed-validation-httpcode="401"
+                  output-token-variable-name="caller">
+      <openid-config url="https://login.microsoftonline.com/__TENANT__/v2.0/.well-known/openid-configuration" />
+      <audiences><audience>__AUDIENCE__</audience></audiences>
+      <issuers><issuer>https://login.microsoftonline.com/__TENANT__/v2.0</issuer></issuers>
+      <required-claims>
+        <claim name="tid" match="all"><value>__TENANT__</value></claim>
+        <claim name="ver" match="all"><value>2.0</value></claim>
+      </required-claims>
+    </validate-jwt>
+    <choose>
+      <when condition='@{
+        var caller = (Jwt)context.Variables["caller"];
+        return caller.Claims.ContainsKey("scp")
+          || !caller.Claims.ContainsKey("azp") || caller.Claims["azp"].Length != 1
+          || caller.Claims["azp"][0] != "__REQUESTER_CLIENT__"
+          || !caller.Claims.ContainsKey("oid") || caller.Claims["oid"].Length != 1
+          || caller.Claims["oid"][0] != "__REQUESTER_PRINCIPAL__"
+          || !caller.Claims.ContainsKey("roles") || !caller.Claims["roles"].Contains("CONTOSO.Invoke");
+      }'>
+        <return-response>
+          <set-status code="403" reason="Forbidden" />
+          <set-header name="Content-Type" exists-action="override"><value>application/json</value></set-header>
+          <set-body>{"error":"forbidden"}</set-body>
+        </return-response>
+      </when>
+      <when condition='@(context.Request.Url.Query.Count != 0
+          || context.Request.Headers.GetValueOrDefault("A2A-Version", "") != "1.0"
+          || context.Request.Headers.ContainsKey("Content-Encoding"))'>
+        <return-response>
+          <set-status code="400" reason="Bad Request" />
+          <set-header name="Content-Type" exists-action="override"><value>application/json</value></set-header>
+          <set-body>{"error":"invalid_request"}</set-body>
+        </return-response>
+      </when>
+    </choose>
+    <rate-limit-by-key calls="30" renewal-period="60" counter-key="contoso-a2a-requester" />
+    <validate-content id="request-schema" unspecified-content-type-action="prevent"
+                      max-size="32768" size-exceeded-action="prevent">
+      <content type="application/json" validate-as="json" schema-id="contoso-a2a-request"
+               action="prevent" allow-additional-properties="false" case-insensitive-property-names="false" />
+    </validate-content>
+    <!-- JObject normally replaces duplicate properties. Reject ambiguous framing before forwarding. -->
+    <set-variable name="request-valid" value='@{
+      try {
+        var raw = context.Request.Body.As&lt;string&gt;(preserveContent: true);
+        if (Encoding.UTF8.GetByteCount(raw) &gt; 32768) { return false; }
+        var tokens = Regex.Split(raw, @"(""(?:\\.|[^""\\])*""|[{}:])");
+        var objects = new Stack&lt;HashSet&lt;string&gt;&gt;();
+        for (var i = 1; i &lt; tokens.Length; i += 2) {
+          var token = tokens[i];
+          if (token == "{") { objects.Push(new HashSet&lt;string&gt;(StringComparer.Ordinal)); }
+          else if (token == "}") { objects.Pop(); }
+          else if (i + 2 &lt; tokens.Length &amp;&amp; tokens[i + 2] == ":"
+              &amp;&amp; token.StartsWith("\"")) {
+            var key = JsonConvert.DeserializeObject&lt;string&gt;(token);
+            if (!objects.Peek().Add(key)) { return false; }
+          }
+        }
+        var body = JObject.Parse(raw);
+        return Encoding.UTF8.GetByteCount((string)body["params"]["message"]["parts"][0]["text"]) &lt;= 8000;
+      } catch { return false; }
+    }' />
+    <choose>
+      <when condition='@(!(bool)context.Variables["request-valid"])'>
+        <return-response>
+          <set-status code="400" reason="Bad Request" />
+          <set-header name="Content-Type" exists-action="override"><value>application/json</value></set-header>
+          <set-body>{"error":"invalid_request"}</set-body>
+        </return-response>
+      </when>
+    </choose>
+    <set-variable name="rpc-id" value='@((string)context.Request.Body.As&lt;JObject&gt;(preserveContent: true)["id"])' />
+    <set-header name="x-agent-foundry-call-id" exists-action="delete" />
+    <set-header name="x-ms-client-principal" exists-action="delete" />
+    <set-header name="x-ms-client-principal-id" exists-action="delete" />
+    <set-header name="x-ms-client-principal-name" exists-action="delete" />
+    <set-header name="x-ms-token-aad-access-token" exists-action="delete" />
+    <set-header name="x-contoso-user-context" exists-action="delete" />
+    <set-header name="x-contoso-identity-mode" exists-action="delete" />
+    <set-header name="Ocp-Apim-Subscription-Key" exists-action="delete" />
+    <set-header name="x-request-id" exists-action="override"><value>@(context.RequestId.ToString())</value></set-header>
+    <set-backend-service base-url="__FOUNDRY_ORIGIN__" />
+    <rewrite-uri template="__ROUTER_PATH__" copy-unmatched-params="false" />
+    <authentication-managed-identity id="foundry-credential" resource="https://ai.azure.com"
+                                      output-token-variable-name="foundry-token" ignore-error="false" />
+    <set-header name="Authorization" exists-action="override">
+      <value>@("Bearer " + (string)context.Variables["foundry-token"])</value>
+    </set-header>
+  </inbound>
+  <backend>
+    <forward-request timeout="70" follow-redirects="false" buffer-response="true" fail-on-error-status-code="false" />
+  </backend>
+  <outbound>
+    <set-variable name="response-valid" value='@{
+      try {
+        if (context.Response.StatusCode != 200) { return false; }
+        var raw = context.Response.Body.As&lt;string&gt;(preserveContent: true);
+        if (Encoding.UTF8.GetByteCount(raw) &gt; 1048576) { return false; }
+        var body = JObject.Parse(raw);
+        return body.Properties().Count() == 3
+          &amp;&amp; (string)body["jsonrpc"] == "2.0"
+          &amp;&amp; body["id"] != null &amp;&amp; body["id"].Type == JTokenType.String
+          &amp;&amp; (string)body["id"] == (string)context.Variables["rpc-id"]
+          &amp;&amp; body["result"] != null &amp;&amp; body["result"].Type == JTokenType.Object;
+      } catch { return false; }
+    }' />
+    <choose>
+      <when condition='@(!(bool)context.Variables["response-valid"])'>
+        <return-response>
+          <set-status code="503" reason="Service Unavailable" />
+          <set-header name="Content-Type" exists-action="override"><value>application/json</value></set-header>
+          <set-body>{"error":"contoso_unavailable"}</set-body>
+        </return-response>
+      </when>
+    </choose>
+    <set-header name="Cache-Control" exists-action="override"><value>no-store</value></set-header>
+    <set-header name="x-request-id" exists-action="override"><value>@(context.RequestId.ToString())</value></set-header>
+  </outbound>
+  <on-error>
+    <return-response>
+      <set-status code='@(context.LastError.Reason == "OperationNotFound" ? 404 : context.LastError.PolicyId == "caller-jwt" ? 401 : context.LastError.PolicyId == "request-schema" ? 400 : 503)' reason="Request rejected" />
+      <set-header name="Content-Type" exists-action="override"><value>application/json</value></set-header>
+      <set-header name="Cache-Control" exists-action="override"><value>no-store</value></set-header>
+      <set-body>@(context.LastError.Reason == "OperationNotFound" ? "{\"error\":\"not_found\"}" : context.LastError.PolicyId == "caller-jwt" ? "{\"error\":\"unauthorized\"}" : context.LastError.PolicyId == "request-schema" ? "{\"error\":\"invalid_request\"}" : "{\"error\":\"contoso_unavailable\"}")</set-body>
+    </return-response>
+  </on-error>
+</policies>

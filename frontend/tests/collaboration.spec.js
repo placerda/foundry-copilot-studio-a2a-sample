@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
 
-const functionURL = "https://synthetic.lambda-url.us-east-2.on.aws/**";
+const functionURL = "**/api/chat";
 const evidence = "test-results/supplier-buyer-ui";
 const answer = {
   answer: "## Proposal assessment\n\n**Synthetic test response**, not live approval.\n\n- Check the buyer's terms.\n- Confirm the evidence limits.\n\n| Delivery | Units |\n| --- | --- |\n| Friday | 300 |\n| Monday | 200 |\n\n[Reference](https://example.com/terms) [Unsafe](javascript:alert)\n\n<script>window.unsafe=true</script>\n\n```html\n<img src=x onerror=alert(1)>\n```",
@@ -30,15 +30,16 @@ for (const [device, size] of [["desktop", { width: 1440, height: 1000 }], ["mobi
     await page.addInitScript(() => { window.contosoTestEnabled = true; });
     await page.goto("/");
     await expect(page.locator("#delivery-context")).not.toHaveAttribute("open", "");
-    await expect(page.locator("select")).toHaveCount(0);
+    await expect(page.locator("select")).toHaveCount(1);
+    await expect(page.locator("#identity-mode")).toHaveValue("shared-delegated");
     await expect(page.getByRole("heading", { name: "How the agents collaborate" })).toBeVisible();
     expect(await page.locator(".connection-panel").evaluate(node =>
       !!(node.previousElementSibling?.classList.contains("chat-panel")))).toBe(true);
     await expect(page.locator(".agent-flow li")).toHaveCount(3);
     await expect(page.locator(".agent-flow")).toContainText("Microsoft Foundry");
     await expect(page.locator(".agent-flow")).toContainText("Copilot Studio");
-    await expect(page.locator(".flow-link strong")).toHaveText(["A2A 1.0", "A2A 1.0"]);
-    await expect(page.locator(".client-protocol")).toHaveText("HTTPS / JSON");
+    await expect(page.locator(".flow-link strong")).toHaveText(["A2A 1.0 / HTTPS", "A2A 1.0"]);
+    await expect(page.locator(".client-protocol")).toHaveText("Loopback HTTP / JSON");
     expect(await page.locator(".agent-flow img").evaluateAll(images =>
       images.length === 2 && images.every(image => image.complete && image.naturalWidth > 0))).toBe(true);
     await expect(page.locator(".diagram-note")).toContainText("not a live execution trace");
@@ -59,9 +60,11 @@ for (const [device, size] of [["desktop", { width: 1440, height: 1000 }], ["mobi
     await expect(page.locator("#reset")).toBeVisible();
     await expect(page.locator("#logout")).toBeVisible();
     await page.locator(".access-path > summary").click();
-    await expect(page.locator(".access-path")).toContainText("AWS Lambda requester");
+    await expect(page.locator(".access-path")).toContainText("local Python requester");
     await expect(page.locator(".access-path")).toContainText("not a separate conversational agent");
-    await expect(page.locator(".access-path")).toContainText("Azure Functions Gateway");
+    await expect(page.locator(".access-path")).toContainText("authenticated APIM");
+    await expect(page.locator(".access-path")).not.toContainText("not configured yet");
+    await expect(page.locator(".flow-link").first()).not.toContainText("(target)");
     await expect(page.locator(".access-path")).toContainText("JSON-RPC 2.0 over HTTPS");
     await page.locator(".access-path > summary").click();
     let payload;
@@ -88,7 +91,8 @@ for (const [device, size] of [["desktop", { width: 1440, height: 1000 }], ["mobi
     await expect(details).toContainText("Synthetic test gateway");
     await details.locator("summary").click();
     expect(payload).toEqual({ messages: [{ role: "user", content: draft }],
-      contoso_options: { integration: "a2a", studio_variant: "copilot-harness" } });
+      contoso_options: { integration: "a2a", studio_variant: "copilot-harness" },
+      identity_mode: "shared-delegated" });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await page.screenshot({ path: `${evidence}/${device}-response.png`, fullPage: true });
     await page.locator("#reset").click();

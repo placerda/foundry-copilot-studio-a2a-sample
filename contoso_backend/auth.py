@@ -195,3 +195,4 @@ class Authorizer:
         if (not isinstance(scope, str) or self.settings.scope not in scope.split()
                 or claims.get("oid") != self.settings.owner_oid):
             raise ChatFailure(403, "forbidden", "This user does not have access to the chat.")
+        return {"tenant_id": claims["tid"], "object_id": claims["oid"]}

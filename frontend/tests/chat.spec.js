@@ -65,7 +65,7 @@ test("root OAuth return in popup leaves hash intact and does not initialize MSAL
 
 test("authorized text-only response and associated limit notice without continuation", async ({ page }) => {
   let calls = 0;
-  await page.route("https://synthetic.lambda-url.us-east-2.on.aws/**", route => {
+  await page.route("**/api/chat", route => {
     calls++;
     expect(route.request().headers().authorization).toBe("Bearer synthetic-access-token");
     return route.fulfill({ json: result("<img src=x onerror=alert(1)>", true) });
@@ -90,7 +90,7 @@ for (const value of [
 ]) {
   test(`malformed success ${JSON.stringify(value)}`, async ({ page }) => {
     let calls = 0;
-    await page.route("https://synthetic.lambda-url.us-east-2.on.aws/**", route => {
+    await page.route("**/api/chat", route => {
       calls++;
       return route.fulfill({ json: value });
     });
@@ -106,7 +106,7 @@ for (const value of [
 
 test("context remains in memory, notices stay on their message and reset/reload erase it", async ({ page }) => {
   const requests = [];
-  await page.route("https://synthetic.lambda-url.us-east-2.on.aws/**", route => {
+  await page.route("**/api/chat", route => {
     requests.push(route.request().postDataJSON());
     return route.fulfill({ json: result("memory-answer", requests.length === 1) });
   });
@@ -131,7 +131,7 @@ test("context remains in memory, notices stay on their message and reset/reload 
 
 test("reset during token await retains lock and prevents late POST", async ({ page }) => {
   let calls = 0;
-  await page.route("https://synthetic.lambda-url.us-east-2.on.aws/**", route => {
+  await page.route("**/api/chat", route => {
     calls++;
     return route.fulfill({ json: result("late", true) });
   });
@@ -150,7 +150,7 @@ test("reset during token await retains lock and prevents late POST", async ({ pa
 test("late limited HTTP response cannot restore reset conversation", async ({ page }) => {
   let started;
   const called = new Promise(resolve => { started = resolve; });
-  await page.route("https://synthetic.lambda-url.us-east-2.on.aws/**", async route => {
+  await page.route("**/api/chat", async route => {
     started();
     await new Promise(resolve => setTimeout(resolve, 400));
     await route.fulfill({ json: result("late", true) }).catch(() => {});
@@ -166,7 +166,7 @@ test("late limited HTTP response cannot restore reset conversation", async ({ pa
 });
 
 test("logout clears local state even if provider popup fails", async ({ page }) => {
-  await page.route("https://synthetic.lambda-url.us-east-2.on.aws/**", route =>
+  await page.route("**/api/chat", route =>
     route.fulfill({ json: result("reply", true) }));
   await login(page);
   await page.locator("#draft").fill("secret-in-memory");
@@ -185,7 +185,7 @@ for (const [status, hint] of [[400, "Invalid message"], [401, "Invalid or expire
   [429, "busy"], [500, "Internal service error"], [502, "connection is unavailable"]]) {
   test(`friendly ${status} platform error keeps draft and no retry`, async ({ page }) => {
     let calls = 0;
-    await page.route("https://synthetic.lambda-url.us-east-2.on.aws/**", route => {
+    await page.route("**/api/chat", route => {
       calls++;
       return route.fulfill({ status, contentType: "text/plain", body: "SECRET-RAW-UPSTREAM" });
     });
@@ -202,7 +202,7 @@ for (const [status, hint] of [[400, "Invalid message"], [401, "Invalid or expire
 
 test("ten submits during silent renewal produce one POST and interaction only when required", async ({ page }) => {
   let calls = 0;
-  await page.route("https://synthetic.lambda-url.us-east-2.on.aws/**", route => {
+  await page.route("**/api/chat", route => {
     calls++;
     return route.fulfill({ json: result("ok") });
   });
@@ -220,7 +220,7 @@ test("ten submits during silent renewal produce one POST and interaction only wh
 
 test("unrelated token failure never falls back to popup or sends POST", async ({ page }) => {
   let calls = 0;
-  await page.route("https://synthetic.lambda-url.us-east-2.on.aws/**", route => { calls++; return route.abort(); });
+  await page.route("**/api/chat", route => { calls++; return route.abort(); });
   await login(page);
   await page.evaluate(() => { window.tokenFailure = true; });
   await page.locator("#draft").fill("keep");
@@ -235,7 +235,7 @@ test("100 second collaboration timeout has uncertain outcome and manual retry on
   let calls = 0;
   let requestStarted;
   const started = new Promise(resolve => { requestStarted = resolve; });
-  await page.route("https://synthetic.lambda-url.us-east-2.on.aws/**", () => {
+  await page.route("**/api/chat", () => {
     calls++;
     requestStarted();
   });
@@ -252,13 +252,13 @@ test("100 second collaboration timeout has uncertain outcome and manual retry on
 });
 
 test("non-JSON success and network failure stay explicit", async ({ page }) => {
-  await page.route("https://synthetic.lambda-url.us-east-2.on.aws/**", route =>
+  await page.route("**/api/chat", route =>
     route.fulfill({ status: 200, contentType: "text/plain", body: "SECRET-BODY" }));
   await login(page);
   await page.locator("#draft").fill("keep");
   await page.locator("#send").click();
   await expect(page.locator("#error")).toContainText("Invalid response");
-  await page.route("https://synthetic.lambda-url.us-east-2.on.aws/**", route => route.abort());
+  await page.route("**/api/chat", route => route.abort());
   await page.locator("#send").click();
   await expect(page.locator("#error")).toContainText("Network failure");
   await expect(page.locator("#messages article")).toHaveCount(0);

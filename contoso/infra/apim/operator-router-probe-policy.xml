@@ -1,0 +1,81 @@
+<policies>
+  <inbound>
+    <base />
+    <set-body>@{
+      var id = context.RequestId.ToString();
+      return JsonConvert.SerializeObject(new {
+        jsonrpc = "2.0", id = id, method = "SendMessage",
+        @params = new {
+          message = new {
+            messageId = id, role = "ROLE_USER",
+            parts = new[] { new { text = "CONTOSO identity probe" } }
+          },
+          configuration = new {
+            acceptedOutputModes = new[] { "text/plain" }, returnImmediately = false
+          }
+        }
+      });
+    }</set-body>
+    <set-header name="A2A-Version" exists-action="override"><value>1.0</value></set-header>
+    <rewrite-uri template="__ROUTER_PATH__" copy-unmatched-params="false" />
+  </inbound>
+  <backend>
+    <base />
+  </backend>
+  <outbound>
+    <!-- Do not inherit the SDK Responses parser: this probe observes native A2A framing. -->
+    <set-header name="Content-Type" exists-action="override"><value>application/json</value></set-header>
+    <set-header name="Cache-Control" exists-action="override"><value>no-store</value></set-header>
+    <set-body>@{
+      var status = context.Response.StatusCode;
+      try {
+        var raw = context.Response.Body.As&lt;string&gt;(preserveContent: true);
+        if (Encoding.UTF8.GetByteCount(raw) &gt; 65536) {
+          return JsonConvert.SerializeObject(new { upstream_status = status, shape = "oversized" });
+        }
+        var body = JToken.Parse(raw) as JObject;
+        if (body == null) {
+          return JsonConvert.SerializeObject(new { upstream_status = status, shape = "non-object" });
+        }
+        var known = new[] { "jsonrpc", "id", "result", "error", "status", "output", "body", "headers", "statusCode" };
+        var names = body.Properties().Select(p =&gt; p.Name).Where(n =&gt; known.Contains(n)).ToArray();
+        var result = body["result"] as JObject;
+        var resultShape = result == null ? "absent" : result["message"] != null ? "message"
+          : result["task"] != null ? "task" : "other";
+        var error = body["error"] as JObject;
+        var code = error == null ? null : error["code"];
+        var errorClass = "none";
+        if (error != null) {
+          errorClass = "other";
+          if (code != null &amp;&amp; code.Type == JTokenType.Integer) {
+            var value = code.ToString();
+            if (new[] { "-32700", "-32600", "-32601", "-32602", "-32603", "-32009", "-32004" }.Contains(value)) {
+              errorClass = value;
+            }
+          }
+        }
+        var category = "unclassified";
+        if (errorClass == "-32602" &amp;&amp; error["message"] != null
+          &amp;&amp; error["message"].Type == JTokenType.String
+          &amp;&amp; (string)error["message"] == "The request or platform caller is not authorized") {
+          category = "router-admission-or-configuration";
+        }
+        return JsonConvert.SerializeObject(new {
+          upstream_status = status, shape = "object",
+          root_key_count = body.Properties().Count(), known_root_keys = names,
+          jsonrpc_2 = (string)body["jsonrpc"] == "2.0",
+          response_id_matches = body["id"] != null &amp;&amp; body["id"].Type == JTokenType.String
+            &amp;&amp; (string)body["id"] == context.RequestId.ToString(),
+          result_shape = resultShape, rpc_error_class = errorClass,
+          rpc_error_category = category
+        });
+      } catch {
+        return JsonConvert.SerializeObject(new { upstream_status = status, shape = "unparseable" });
+      }
+    }</set-body>
+    <set-status code="200" reason="Diagnostic completed" />
+  </outbound>
+  <on-error>
+    <base />
+  </on-error>
+</policies>

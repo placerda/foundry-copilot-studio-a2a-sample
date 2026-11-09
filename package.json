@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "node frontend/build.mjs",
-    "test": "node --test frontend/tests/conversation.test.js frontend/tests/auth.test.js",
+    "test": "node --test frontend/tests/conversation.test.js frontend/tests/auth.test.js frontend/tests/identity.test.js",
     "test:ui": "playwright test"
   },
   "dependencies": {

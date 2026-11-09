@@ -39,10 +39,8 @@ export function validateConfig(config) {
       || config.REDIRECT_URI !== "http://localhost:8000/") {
     throw new Error("Invalid public configuration.");
   }
-  const url = new URL(config.FUNCTION_URL);
-  if (url.protocol !== "https:" || !/^[a-z0-9-]+\.lambda-url\.us-east-2\.on\.aws$/.test(url.hostname)
-      || url.username || url.password || url.port || url.pathname !== "/" || url.search || url.hash) {
-    throw new Error("Invalid function URL.");
+  if (config.API_URL !== "/api/chat" || "FUNCTION_URL" in config) {
+    throw new Error("Invalid local API route.");
   }
   return config;
 }

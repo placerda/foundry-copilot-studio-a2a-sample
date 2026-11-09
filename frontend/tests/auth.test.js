@@ -6,22 +6,23 @@ const valid = {
   TENANT_ID: "11111111-1111-1111-1111-111111111111",
   SPA_CLIENT_ID: "22222222-2222-2222-2222-222222222222",
   API_SCOPE: "api://33333333-3333-3333-3333-333333333333/access_as_user",
-  FUNCTION_URL: "https://synthetic.lambda-url.us-east-2.on.aws/",
+  API_URL: "/api/chat",
   REDIRECT_URI: "http://localhost:8000/",
 };
 
-test("public configuration requires exact tenant, API scope, Ohio root URL and redirect", () => {
+test("public configuration requires exact tenant, API scope, local route and redirect", () => {
   assert.equal(validateConfig(valid), valid);
   for (const changes of [
     { TENANT_ID: "" }, { SPA_CLIENT_ID: "not-a-guid" },
     { API_SCOPE: "api://------------------------------------/access_as_user" },
     { API_SCOPE: "https://graph.microsoft.com/User.Read" },
-    { FUNCTION_URL: "http://synthetic.lambda-url.us-east-2.on.aws/" },
-    { FUNCTION_URL: "https://synthetic.lambda-url.us-east-1.on.aws/" },
-    { FUNCTION_URL: "https://synthetic.lambda-url.us-east-2.on.aws/other" },
-    { FUNCTION_URL: "https://synthetic.lambda-url.us-east-2.on.aws/?x=y" },
-    { FUNCTION_URL: "https://synthetic.lambda-url.us-east-2.on.aws/#fragment" },
-    { FUNCTION_URL: "https://synthetic.lambda-url.us-east-2.on.aws:8443/" },
+    { API_URL: "http://localhost:8000/api/chat" },
+    { API_URL: "https://example.com/api/chat" },
+    { API_URL: "//example.com/api/chat" },
+    { API_URL: "/api/chat?x=y" },
+    { API_URL: "/api/chat#fragment" },
+    { API_URL: "/api/other" },
+    { FUNCTION_URL: "https://obsolete.example.com/" },
     { REDIRECT_URI: "http://127.0.0.1:8000/" },
     { CONTOSO_ENABLED: "true" }, { CONTOSO_ENABLED: 1 }, { CONTOSO_ENABLED: null },
   ]) {

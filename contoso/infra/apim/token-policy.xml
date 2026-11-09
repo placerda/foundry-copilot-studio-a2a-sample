@@ -1,0 +1,85 @@
+<policies>
+  <inbound>
+    <validate-jwt header-name="Authorization" require-scheme="Bearer" require-expiration-time="true" require-signed-tokens="true" failed-validation-httpcode="401" failed-validation-error-message="Unauthorized">
+      <openid-config url="https://login.microsoftonline.com/__TENANT__/v2.0/.well-known/openid-configuration" />
+      <audiences><audience>__API_AUDIENCE__</audience></audiences>
+      <issuers><issuer>https://login.microsoftonline.com/__TENANT__/v2.0</issuer></issuers>
+      <required-claims>
+        <claim name="ver" match="all"><value>2.0</value></claim>
+        <claim name="tid" match="all"><value>__TENANT__</value></claim>
+        <claim name="idtyp" match="all"><value>app</value></claim>
+        <claim name="oid" match="all"><value>__ROUTER_OID__</value></claim>
+        <claim name="azp" match="all"><value>__ROUTER_CLIENT__</value></claim>
+        <claim name="roles" match="any"><value>CONTOSO.Connection.Use</value></claim>
+      </required-claims>
+    </validate-jwt>
+    <choose>
+      <when condition="@(context.Request.Url.Query.Count != 0 || !context.Request.Headers.GetValueOrDefault(&quot;Content-Type&quot;, &quot;&quot;).Split(';')[0].Trim().Equals(&quot;application/json&quot;, StringComparison.OrdinalIgnoreCase) || !Regex.IsMatch(context.Request.Headers.GetValueOrDefault(&quot;Content-Length&quot;, &quot;&quot;), @&quot;\A[1-9][0-9]{0,2}\z&quot;) || context.Request.Headers.ContainsKey(&quot;Transfer-Encoding&quot;))">
+        <return-response><set-status code="400" reason="Invalid request" /></return-response>
+      </when>
+    </choose>
+    <choose>
+      <when condition="@(Int32.Parse(context.Request.Headers.GetValueOrDefault(&quot;Content-Length&quot;, &quot;0&quot;)) &gt; 256)">
+        <return-response><set-status code="400" reason="Invalid request" /></return-response>
+      </when>
+    </choose>
+    <set-variable name="body" value="@(context.Request.Body.As&lt;string&gt;(preserveContent: true))" />
+    <choose>
+      <when condition="@(((string)context.Variables[&quot;body&quot;]).Length &gt; 256 || !Regex.IsMatch((string)context.Variables[&quot;body&quot;], @&quot;\A\s*\{\s*&quot;&quot;provider_id&quot;&quot;\s*:\s*&quot;&quot;studio-copilot-harness&quot;&quot;\s*\}\s*\z&quot;))">
+        <return-response><set-status code="400" reason="Invalid request" /></return-response>
+      </when>
+    </choose>
+    <rate-limit-by-key calls="30" renewal-period="60" counter-key="shared-studio-token-router" />
+    <get-authorization-context provider-id="contoso-studio-v2" authorization-id="shared-paulo" context-variable-name="studioConnection" identity-type="managed" ignore-error="true" />
+    <choose>
+      <when condition="@(!context.Variables.ContainsKey(&quot;studioConnection&quot;) || context.Variables[&quot;studioConnection&quot;] == null)">
+        <return-response>
+          <set-status code="409" reason="Connection required" />
+          <set-header name="Content-Type" exists-action="override"><value>application/json</value></set-header>
+          <set-header name="Cache-Control" exists-action="override"><value>no-store</value></set-header>
+          <set-body>{"error":{"code":"connection_required","message":"Authorize the shared Studio connection."}}</set-body>
+        </return-response>
+      </when>
+    </choose>
+    <set-variable name="studioToken" value="@(((Authorization)context.Variables[&quot;studioConnection&quot;]).AccessToken)" />
+    <validate-jwt token-value="@((string)context.Variables[&quot;studioToken&quot;])" require-expiration-time="true" require-signed-tokens="true" failed-validation-httpcode="502" failed-validation-error-message="Studio connection unavailable" output-token-variable-name="studioJwt">
+      <openid-config url="https://login.microsoftonline.com/__TENANT__/v2.0/.well-known/openid-configuration" />
+      <audiences><audience>https://api.powerplatform.com</audience></audiences>
+      <issuers><issuer>https://login.microsoftonline.com/__TENANT__/v2.0</issuer></issuers>
+      <required-claims>
+        <claim name="ver" match="all"><value>2.0</value></claim>
+        <claim name="tid" match="all"><value>__TENANT__</value></claim>
+        <claim name="oid" match="all"><value>__SHARED_OWNER__</value></claim>
+        <claim name="scp" match="any" separator=" "><value>MCS.InvokeAsA2A</value></claim>
+      </required-claims>
+    </validate-jwt>
+    <return-response>
+      <set-status code="200" reason="OK" />
+      <set-header name="Content-Type" exists-action="override"><value>application/json</value></set-header>
+      <set-header name="Cache-Control" exists-action="override"><value>no-store</value></set-header>
+      <set-header name="Pragma" exists-action="override"><value>no-cache</value></set-header>
+      <set-header name="X-Content-Type-Options" exists-action="override"><value>nosniff</value></set-header>
+      <set-body>@{
+        var jwt = (Jwt)context.Variables["studioJwt"];
+        var expiry = (long)(jwt.ExpirationTime.Value.ToUniversalTime()
+          - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalSeconds;
+        return JsonConvert.SerializeObject(new {
+          token = (string)context.Variables["studioToken"],
+          tenant_id = "__TENANT__", audience = "https://api.powerplatform.com",
+          scopes = new [] { "https://api.powerplatform.com/copilotstudio-a2a/MCS.InvokeAsA2A" },
+          expires_at = expiry
+        });
+      }</set-body>
+    </return-response>
+  </inbound>
+  <backend />
+  <outbound />
+  <on-error>
+    <return-response>
+      <set-status code="503" reason="Connection unavailable" />
+      <set-header name="Cache-Control" exists-action="override"><value>no-store</value></set-header>
+      <set-header name="Content-Type" exists-action="override"><value>application/json</value></set-header>
+      <set-body>{"error":{"code":"connection_unavailable","message":"Studio connection unavailable."}}</set-body>
+    </return-response>
+  </on-error>
+</policies>

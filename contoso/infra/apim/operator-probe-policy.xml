@@ -1,0 +1,233 @@
+<policies>
+  <inbound>
+    <base />
+    <validate-jwt id="operator-jwt" header-name="Authorization" require-scheme="Bearer"
+                  require-signed-tokens="true" require-expiration-time="true" clock-skew="30"
+                  failed-validation-httpcode="401" output-token-variable-name="operator">
+      <openid-config url="https://login.microsoftonline.com/__TENANT__/v2.0/.well-known/openid-configuration" />
+      <audiences><audience>__AUDIENCE__</audience></audiences>
+      <issuers><issuer>https://login.microsoftonline.com/__TENANT__/v2.0</issuer></issuers>
+    </validate-jwt>
+    <choose>
+      <when condition='@{
+        var caller = (Jwt)context.Variables["operator"];
+        return !caller.Claims.ContainsKey("azp") || caller.Claims["azp"].Length != 1
+          || caller.Claims["azp"][0] != "__OPERATOR_CLIENT__"
+          || !caller.Claims.ContainsKey("oid") || caller.Claims["oid"].Length != 1
+          || caller.Claims["oid"][0] != "__OPERATOR_PRINCIPAL__"
+          || !caller.Claims.ContainsKey("scp") || caller.Claims["scp"].Length != 1
+          || !caller.Claims["scp"][0].Split(" ".ToCharArray()).Contains("CONTOSO.Deploy");
+      }'>
+        <return-response>
+          <set-status code="403" reason="Forbidden" />
+          <set-header name="Content-Type" exists-action="override"><value>application/json</value></set-header>
+          <set-body>{"error":"forbidden"}</set-body>
+        </return-response>
+      </when>
+      <when condition='@{
+        try {
+          var raw = context.Request.Body.As&lt;string&gt;(preserveContent: true);
+          return context.Request.Url.Query.Count != 0 || Encoding.UTF8.GetByteCount(raw) &gt; 4096 || raw.Trim() != "{}"
+            || context.Request.Headers.ContainsKey("Content-Encoding")
+            || context.Request.Headers.GetValueOrDefault("Content-Type", "").Split(";".ToCharArray())[0].Trim().ToLowerInvariant() != "application/json";
+        } catch { return true; }
+      }'>
+        <return-response>
+          <set-status code="400" reason="Bad Request" />
+          <set-header name="Content-Type" exists-action="override"><value>application/json</value></set-header>
+          <set-body>{"error":"invalid_request"}</set-body>
+        </return-response>
+      </when>
+    </choose>
+    <rate-limit-by-key calls="10" renewal-period="60" counter-key="contoso-operator-probe" />
+    <set-body>{"input":"CONTOSO identity probe","store":false}</set-body>
+    <set-header name="x-agent-foundry-call-id" exists-action="delete" />
+    <set-header name="x-ms-client-principal" exists-action="delete" />
+    <set-header name="x-ms-client-principal-id" exists-action="delete" />
+    <set-header name="x-ms-client-principal-name" exists-action="delete" />
+    <set-header name="x-ms-token-aad-access-token" exists-action="delete" />
+    <set-header name="x-contoso-user-context" exists-action="delete" />
+    <set-header name="x-contoso-identity-mode" exists-action="delete" />
+    <set-header name="Ocp-Apim-Subscription-Key" exists-action="delete" />
+    <set-header name="Content-Type" exists-action="override"><value>application/json</value></set-header>
+    <set-header name="A2A-Version" exists-action="delete" />
+    <set-header name="Accept" exists-action="override"><value>application/json</value></set-header>
+    <set-backend-service base-url="__FOUNDRY_ORIGIN__" />
+    <rewrite-uri template="__PROBE_PATH__" copy-unmatched-params="false" />
+    <authentication-managed-identity resource="https://ai.azure.com" output-token-variable-name="foundry-token" ignore-error="false" />
+    <set-header name="Authorization" exists-action="override"><value>@("Bearer " + (string)context.Variables["foundry-token"])</value></set-header>
+  </inbound>
+  <backend>
+    <forward-request timeout="40" follow-redirects="false" buffer-response="true" fail-on-error-status-code="false" />
+  </backend>
+  <outbound>
+    <set-header name="Cache-Control" exists-action="override"><value>no-store</value></set-header>
+    <set-header name="x-request-id" exists-action="override"><value>@(context.RequestId.ToString())</value></set-header>
+    <set-body>@{
+      var checkpoint = "response-json";
+      try {
+        var raw = context.Response.Body.As&lt;string&gt;(preserveContent: true);
+        if (context.Response.StatusCode != 200 || Encoding.UTF8.GetByteCount(raw) &gt; 16384) {
+          return "{\"error\":\"contoso_unavailable\"}";
+        }
+        var body = JObject.Parse(raw);
+        if ((string)body["status"] != "completed" || !(body["output"] is JArray)
+            || body["output"].Count() != 1 || (string)body["output"][0]["type"] != "message") {
+          var state = (string)body["status"];
+          var states = new [] { "completed", "failed", "cancelled", "in_progress", "queued", "incomplete" };
+          return new JObject {
+            ["error"] = "contoso_unavailable", ["proof_stage"] = "hosted-response",
+            ["hosted_status"] = states.Contains(state) ? state : "unknown"
+          }.ToString(Newtonsoft.Json.Formatting.None);
+        }
+        var content = body["output"][0]["content"];
+        if (!(content is JArray) || content.Count() != 1
+            || (string)content[0]["type"] != "output_text"
+            || content[0]["text"] == null || content[0]["text"].Type != JTokenType.String) {
+          return "{\"error\":\"contoso_unavailable\",\"proof_stage\":\"message-content\"}";
+        }
+        checkpoint = "proof-json";
+        var text = (string)content[0]["text"];
+        var probe = JObject.Parse(text);
+        var caller = (string)probe["platform_caller_id"];
+        if ((string)probe["status"] == "sdk-s2s-proof") {
+          var stage = (string)probe["stage"];
+          var stages = new [] { "credential-failed", "token-verification-failed", "token-metadata-failed", "workload-identity-mismatch",
+            "application-permission-missing", "studio-failed", "completed" };
+          if (!stages.Contains(stage) || String.IsNullOrWhiteSpace(caller) || caller.Length &gt; 256
+              || caller.Any(c =&gt; Char.IsControl(c))
+              || (string)probe["expected_sdk_identity"] != "__SDK_EXPECTED_PRINCIPAL__"
+              || probe["studio_attempted"] == null || probe["studio_attempted"].Type != JTokenType.Boolean) {
+            return "{\"error\":\"contoso_unavailable\",\"proof_stage\":\"proof-metadata\"}";
+          }
+          var result = new JObject {
+            ["status"] = "sdk-s2s-proof", ["stage"] = stage,
+            ["platform_caller_id"] = caller,
+            ["expected_sdk_identity"] = "__SDK_EXPECTED_PRINCIPAL__",
+            ["studio_attempted"] = (bool)probe["studio_attempted"]
+          };
+          checkpoint = "identity-projection";
+          if (probe["identity"] is JObject) {
+            var identity = probe["identity"];
+            var principal = (string)identity["principal_id"];
+            var client = (string)identity["client_id"];
+            var audience = (string)identity["audience"];
+            var audiences = new [] { "https://api.powerplatform.com", "https://api.powerplatform.com/",
+              "8578e004-a5c6-46e7-913e-12f58912df43" };
+            if ((string)identity["tenant_id"] != "__TENANT__" || (bool)identity["signature_validated"] != false
+                || (string)identity["metadata_source"] != "issued-token-diagnostic"
+                || identity["resource_authorized"] == null || identity["resource_authorized"].Type != JTokenType.Boolean
+                || (bool)identity["resource_authorized"] != (stage == "completed")
+                || !audiences.Contains(audience)
+                || !System.Text.RegularExpressions.Regex.IsMatch(principal ?? "", "^[0-9a-f-]{36}$")
+                || !System.Text.RegularExpressions.Regex.IsMatch(client ?? "", "^[0-9a-f-]{36}$")) {
+              return "{\"error\":\"contoso_unavailable\",\"proof_stage\":\"identity-metadata\"}";
+            }
+            result["identity"] = new JObject {
+              ["tenant_id"] = "__TENANT__", ["principal_id"] = principal, ["client_id"] = client,
+              ["audience"] = audience, ["signature_validated"] = false,
+              ["metadata_source"] = "issued-token-diagnostic",
+              ["resource_authorized"] = (bool)identity["resource_authorized"],
+              ["sdk_identity_matched"] = (bool)identity["sdk_identity_matched"],
+              ["required_role_present"] = (bool)identity["required_role_present"],
+              ["application_only"] = (bool)identity["application_only"]
+            };
+          }
+          checkpoint = "conversation-projection";
+          if (probe["conversation"] is JObject) {
+            var conversation = probe["conversation"];
+            var digest = (string)conversation["response_sha256"];
+            var size = (int)conversation["response_bytes"];
+            var count = (int)conversation["message_count"];
+            if (stage != "completed" || !(bool)result["studio_attempted"]
+                || result["identity"] == null || !(bool)result["identity"]["sdk_identity_matched"]
+                || !(bool)result["identity"]["resource_authorized"]
+                || !(bool)result["identity"]["required_role_present"] || !(bool)result["identity"]["application_only"]
+                || !(bool)conversation["conversation_started"] || size &lt; 0 || size &gt; 65536
+                || count &lt; 0 || count &gt; 100
+                || !System.Text.RegularExpressions.Regex.IsMatch(digest ?? "", "^[0-9a-f]{64}$")) {
+              return "{\"error\":\"contoso_unavailable\",\"proof_stage\":\"conversation-metadata\"}";
+            }
+            checkpoint = "error-type-projection";
+            result["conversation"] = new JObject {
+              ["conversation_started"] = true, ["response_bytes"] = size, ["message_count"] = count,
+              ["response_sha256"] = digest,
+              ["nonempty_message_received"] = (bool)conversation["nonempty_message_received"],
+              ["source_id_mentioned"] = (bool)conversation["source_id_mentioned"],
+              ["partial_delivery_mentioned"] = (bool)conversation["partial_delivery_mentioned"]
+            };
+          }
+          var errorType = (string)probe["error_type"];
+          var operation = (string)probe["studio_operation"];
+          if (operation == "start-conversation" || operation == "ask-question") {
+            result["studio_operation"] = operation;
+          }
+          if (probe["studio_http_status"] != null &amp;&amp; probe["studio_http_status"].Type == JTokenType.Integer) {
+            var statusCode = (int)probe["studio_http_status"];
+            if (stage == "studio-failed" &amp;&amp; statusCode &gt;= 400 &amp;&amp; statusCode &lt;= 599) {
+              result["studio_http_status"] = statusCode;
+            }
+          }
+          if (stage == "studio-failed" || stage == "completed") {
+            var methodToken = probe["studio_final_method"];
+            if (methodToken != null &amp;&amp; methodToken.Type == JTokenType.String) {
+              var method = (string)methodToken;
+              if (method == "GET" || method == "POST" || method == "other") {
+                result["studio_final_method"] = method;
+              }
+            }
+            var redirects = probe["studio_redirect_statuses"] as JArray;
+            if (redirects != null) {
+              var statuses = new JArray();
+              foreach (var item in redirects.Take(8)) {
+                if (item.Type == JTokenType.Integer) {
+                  var code = (int)item;
+                  if (code == 301 || code == 302 || code == 303 || code == 307 || code == 308) {
+                    statuses.Add(code);
+                  }
+                }
+              }
+              result["studio_redirect_statuses"] = statuses;
+            }
+          }
+          if (!String.IsNullOrEmpty(errorType)
+              &amp;&amp; System.Text.RegularExpressions.Regex.IsMatch(errorType, "^[A-Za-z_][A-Za-z0-9_]{0,95}$")) {
+            result["error_type"] = errorType;
+          }
+          return result.ToString(Newtonsoft.Json.Formatting.None);
+        }
+        if ((string)probe["status"] != "identity-bootstrap"
+            || (bool)probe["knowledge_access"] != false || String.IsNullOrWhiteSpace(caller)
+            || caller.Length &gt; 256 || caller.Any(c =&gt; Char.IsControl(c))) {
+          var type = (string)probe["status"];
+          var types = new [] { "answered", "insufficient-evidence", "no-matching-capability",
+            "identity-bootstrap", "identity-link-bootstrap", "sdk-s2s-proof" };
+          return new JObject {
+            ["error"] = "contoso_unavailable", ["proof_stage"] = "unexpected-proof-type",
+            ["proof_type"] = types.Contains(type) ? type : "unknown"
+          }.ToString(Newtonsoft.Json.Formatting.None);
+        }
+        return JsonConvert.SerializeObject(new {
+          status = "identity-bootstrap", platform_caller_id = caller, knowledge_access = false
+        });
+      } catch {
+        return new JObject {
+          ["error"] = "contoso_unavailable", ["proof_stage"] = checkpoint
+        }.ToString(Newtonsoft.Json.Formatting.None);
+      }
+    }</set-body>
+    <choose>
+      <when condition='@((string)context.Response.Body.As&lt;JObject&gt;(preserveContent: true)["error"] != null)'>
+        <set-status code="503" reason="Service Unavailable" />
+      </when>
+    </choose>
+  </outbound>
+  <on-error>
+    <return-response>
+      <set-status code='@(context.LastError.Reason == "OperationNotFound" ? 404 : context.LastError.PolicyId == "operator-jwt" ? 401 : 503)' reason="Request rejected" />
+      <set-header name="Content-Type" exists-action="override"><value>application/json</value></set-header>
+      <set-header name="Cache-Control" exists-action="override"><value>no-store</value></set-header>
+      <set-body>@(context.LastError.Reason == "OperationNotFound" ? "{\"error\":\"not_found\"}" : context.LastError.PolicyId == "operator-jwt" ? "{\"error\":\"unauthorized\"}" : "{\"error\":\"contoso_unavailable\"}")</set-body>
+    </return-response>
+  </on-error>
+</policies>

@@ -1,4 +1,6 @@
 .venv/
+.venv-local/
+.pytest-local-runtime/
 node_modules/
 frontend/dist/
 frontend/config.js
@@ -22,3 +24,4 @@ contoso/infra/*.json
 contoso/infra/*.bicepparam
 .DS_Store
 Thumbs.db
+/.azure/artifacts/

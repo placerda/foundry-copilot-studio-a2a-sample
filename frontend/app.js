@@ -1,16 +1,19 @@
 import { Auth, signInErrorMessage } from "./auth.js";
 import { Conversation } from "./conversation.js";
 import { renderMarkdown } from "./markdown.js";
+import { validateCapabilities, selectedMode, validIdentity } from "./identity.js";
 import { makeContosoPayload, validContoso, readResponse, CONTOSO_TIMEOUT_MS,
   NATIVE_CONTOSO_OPTIONS } from "./contoso.js";
 
 const ui = Object.fromEntries(["error", "login", "logout", "reset", "send", "draft",
   "messages", "processing", "auth-status", "chat-form",
-  "empty-state", "start-hint"].map(id => [id, document.getElementById(id)]));
+  "empty-state", "start-hint", "identity-mode", "identity-reason",
+  "identity-callers"].map(id => [id, document.getElementById(id)]));
 let auth;
 let config;
 let pending = false;
 let signingOut = false;
+let identityReadiness = null;
 const conversation = new Conversation();
 const statusMessages = {
   400: "Invalid message or message exceeds the limits.",
@@ -27,13 +30,15 @@ class RequestFailure extends Error {}
 
 function render() {
   const contosoEnabled = config?.CONTOSO_ENABLED === true;
+  const identityReady = identityReadiness?.modes[ui["identity-mode"].value]?.enabled === true;
+  ui["identity-mode"].disabled = !identityReadiness || pending || signingOut;
   ui.login.hidden = !!auth?.account;
   ui.logout.hidden = !auth?.account;
   ui.reset.hidden = !auth?.account;
   ui.login.disabled = !auth || !!auth.account || pending || signingOut;
   ui.logout.disabled = !auth?.account || signingOut;
   ui.reset.disabled = !auth?.account;
-  ui.send.disabled = !auth?.account || !contosoEnabled || pending || signingOut;
+  ui.send.disabled = !auth?.account || !contosoEnabled || !identityReady || pending || signingOut;
   ui.draft.disabled = ui.send.disabled;
   ui.processing.textContent = pending ? "Processing..." : "";
   ui["auth-status"].textContent = auth?.account
@@ -124,15 +129,16 @@ function append(role, content, limited = false, contoso = null, requestId = null
   ui.messages.append(article);
 }
 
-export function validResponse(value, options = null) {
+export function validResponse(value, options = null, mode = "shared-delegated") {
   return value && typeof value === "object" && !Array.isArray(value)
-    && Object.keys(value).length === (options ? 4 : 3)
+    && Object.keys(value).length === (options ? 4 : 3) + (Object.hasOwn(value, "identity") ? 1 : 0)
     && Object.hasOwn(value, "answer") && Object.hasOwn(value, "request_id")
     && Object.hasOwn(value, "output_limited")
     && typeof value.answer === "string" && value.answer.trim().length > 0
     && !/[\uD800-\uDFFF]/u.test(value.answer)
     && typeof value.request_id === "string" && value.request_id.length > 0
     && typeof value.output_limited === "boolean"
+    && (!Object.hasOwn(value, "identity") || validIdentity(value.identity, mode))
     && (!options || validContoso(value.contoso, options));
 }
 
@@ -140,6 +146,15 @@ try {
   ({ default: config } = await import("./config.js"));
   auth = new Auth(config);
   await auth.initialize();
+  const readinessResponse = await fetch("/api/capabilities", {
+    credentials: "omit", cache: "no-store", signal: AbortSignal.timeout(5000),
+  });
+  if (!readinessResponse.ok) throw new Error("Identity readiness unavailable.");
+  identityReadiness = validateCapabilities(await readResponse(readinessResponse));
+  for (const option of ui["identity-mode"].options) {
+    option.disabled = identityReadiness.modes[option.value]?.enabled !== true;
+  }
+  ui["identity-reason"].textContent = "Shared connection selected.";
   if (config.CONTOSO_ENABLED !== true) {
     ui.error.textContent = "Agent network is not configured. Enable CONTOSO_ENABLED only after configuring the A2A connection.";
   }
@@ -170,11 +185,15 @@ ui["chat-form"].addEventListener("submit", async event => {
   conversation.draft = ui.draft.value;
   const draft = conversation.draft;
   let payload;
+  let mode;
   const options = NATIVE_CONTOSO_OPTIONS;
   try {
-    payload = makeContosoPayload(conversation.confirmedPairs, draft, options);
+    mode = selectedMode(ui["identity-mode"].value, identityReadiness);
+    payload = makeContosoPayload(conversation.confirmedPairs, draft, options, mode);
   } catch {
-    ui.error.textContent = "Enter a valid question of up to 2,000 characters within the byte limit.";
+    ui.error.textContent = identityReadiness?.modes[ui["identity-mode"].value]?.enabled === true
+      ? "Enter a valid question of up to 2,000 characters within the byte limit."
+      : "This scenario is unavailable. Select Shared delegated connection.";
     return;
   }
   pending = true;
@@ -197,7 +216,7 @@ ui["chat-form"].addEventListener("submit", async event => {
       timedOut = true;
       operation.controller.abort();
     }, timeoutMs);
-    const response = await fetch(config.FUNCTION_URL, {
+    const response = await fetch(config.API_URL, {
       method: "POST", credentials: "omit",
       signal: operation.controller.signal,
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
@@ -212,8 +231,12 @@ ui["chat-form"].addEventListener("submit", async event => {
       throw new RequestFailure("Invalid response from the service.");
     }
     const result = await readResponse(response);
-    if (!validResponse(result, options)) throw new RequestFailure("Invalid response from the service.");
+    if (!validResponse(result, options, mode)) throw new RequestFailure("Invalid response from the service.");
     if (current() && conversation.confirm(generation, draft, result)) {
+      if (result.identity) {
+        ui["identity-callers"].textContent = `App user: ${result.identity.application_caller.object_id} `
+          + `(tenant ${result.identity.application_caller.tenant_id}). Studio identity: shared connection (unverified).`;
+      }
       append("user", draft);
       append("assistant", result.answer, result.output_limited, result.contoso, result.request_id);
       ui.draft.value = "";
@@ -222,7 +245,7 @@ ui["chat-form"].addEventListener("submit", async event => {
     if (current()) {
       let message;
       if (timedOut) {
-        message = `The request timed out after ${timeoutMs / 1000} seconds. Execution may continue in AWS; the outcome is uncertain.`;
+        message = `The request timed out after ${timeoutMs / 1000} seconds. Downstream execution may continue; the outcome is uncertain.`;
       } else if (error instanceof RequestFailure) {
         message = error.message;
       } else if (phase === "token") {
@@ -251,10 +274,20 @@ function resetConversation() {
   ui.messages.replaceChildren();
   ui.draft.value = "";
   ui.error.textContent = "";
+  ui["identity-callers"].textContent = "App user: not verified. Studio identity: shared connection (unverified).";
   render();
 }
 
 ui.reset.addEventListener("click", () => resetConversation());
+ui["identity-mode"].addEventListener("change", () => {
+  resetConversation();
+  const entry = identityReadiness?.modes[ui["identity-mode"].value];
+  ui["identity-reason"].textContent = entry?.enabled === true ? "Shared connection selected." : "Not configured.";
+  if (entry?.enabled !== true) {
+    ui.error.textContent = "This scenario is unavailable. Select Shared delegated connection.";
+  }
+  render();
+});
 for (const button of document.querySelectorAll("[data-prompt]")) {
   button.addEventListener("click", () => {
     if (ui.send.disabled) return;

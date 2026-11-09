@@ -143,17 +143,17 @@ function drawing(width, height) {
 }
 
 const overview = drawing(2200, 850)
-overview.header("Supplier–Buyer Agent Collaboration", "Foundry + Copilot Studio A2A  |  Read the numbered request path from left to right")
+overview.header("Supplier–Buyer Agent Collaboration", "Local + APIM target (cutover pending)  |  Shared delegated Studio connection")
 overview.rect(570, 220, 1110, 375, "#f5f9fe", "#a6c5e8")
 overview.text(600, 239, "AZURE  /  PRIVATE HOSTED RUNTIME", 20, 600, 1000)
 overview.rect(1810, 220, 360, 375, "#faf7fe", "#d4c3e5")
 overview.text(1835, 239, "POWER PLATFORM", 20, 600, 300)
-overview.box(60, 320, 340, 230, "Approved client", ["Authenticated requester", "Browser or backend", "AWS Lambda is optional"], null, 1)
-overview.box(610, 320, 370, 230, "Azure Functions", ["Authenticated gateway", "Controlled public ingress", "Managed-identity access"], "functions", 2)
+overview.box(60, 320, 340, 230, "Local client", ["Browser + Python requester", "Loopback HTTP / JSON", "Verified Entra guest token"], null, 1)
+overview.box(610, 320, 370, 230, "API Management", ["Developer / external VNet", "Authenticated public ingress", "Managed-identity access"], null, 2)
 overview.box(1210, 320, 410, 230, "Microsoft Foundry", ["Private Hosted agent", "Explicit capability routing", "Preserves source attribution"], "foundry", 3)
 overview.box(1830, 320, 320, 230, "Copilot Studio", ["Published agent", "Native A2A endpoint", "Approved delegated token"], "copilot-studio", 4)
 overview.arrow([[400, 435], [610, 435]])
-overview.text(440, 388, "HTTPS", 20, 400, 170)
+overview.text(410, 376, ["A2A 1.0", "HTTPS"], 20, 400, 195)
 overview.arrow([[980, 435], [1210, 435]], palette.private)
 overview.text(1005, 376, ["Private Link", "HTTPS"], 20, 400, 185)
 overview.arrow([[1620, 435], [1830, 435]])
@@ -165,31 +165,31 @@ overview.text(830, 684, ["Private Azure service access", "No client VPN required
 overview.icon("copilot-studio", 1500, 695, 42)
 overview.text(1560, 684, ["Fictional business scenario", "Insight + citations, or explicit no-match"], 21, 400, 620)
 overview.text(60, 790, "Responses return through the same chain. The agent-to-agent initiation is Foundry → Copilot Studio.", 20, 400, 2080)
-await overview.save("architecture-overview", "Supplier–Buyer Agent Collaboration overview", "Four numbered steps: approved client, Azure Functions gateway, private Foundry Hosted agent, and Copilot Studio A2A.")
+await overview.save("architecture-overview", "Supplier–Buyer Agent Collaboration target overview", "Target, not deployment evidence: local browser/Python client, APIM, private Foundry Hosted agent, and shared delegated Copilot Studio A2A.")
 
 const detail = drawing(2360, 2290)
-detail.header("Supplier–Buyer Agent Collaboration", "Private Foundry + Copilot Studio A2A  |  Network, identity, and operator paths separated")
+detail.header("Supplier–Buyer Agent Collaboration", "Local + APIM target (cutover pending)  |  Network, identity, and operator paths separated")
 detail.rect(45, 190, 540, 545, "none", "#bdc8d6")
 detail.text(75, 210, "CLIENT  /  STAGE 1", 20, 600, 460)
 detail.box(80, 275, 440, 155, "Browser client", ["Microsoft sign-in + approved guest", "API scope, memory-only MSAL cache"], null, 1)
-detail.box(80, 490, 440, 165, "External requester", ["Optional AWS Lambda example", "Verifies guest, uses its own app identity"], null)
+detail.box(80, 490, 440, 165, "Local Python requester", ["Real HTTP server /api/chat", "Verifies guest, uses its own app identity"], null)
 detail.arrow([[300, 430], [300, 490]])
-detail.text(320, 446, "HTTPS", 19, 400, 150)
+detail.text(320, 436, ["Loopback HTTP", "JSON"], 19, 400, 200)
 
 detail.rect(665, 190, 1300, 930, "#f5f9fe", "#a6c5e8")
 detail.text(695, 210, "AZURE  /  SELECTED REGION", 20, 600, 1200)
-detail.box(700, 275, 340, 155, "Functions gateway", ["Public HTTPS + Easy Auth", "Exact caller and role validation"], "functions", 2)
+detail.box(700, 275, 340, 155, "APIM gateway", ["Public HTTPS + Entra JWT", "Exact caller and role validation"], null, 2)
 detail.box(1420, 275, 420, 155, "Foundry project API", ["Public network disabled", "Private project / agent endpoint"], "foundry")
 detail.arrow([[520, 570], [620, 570], [620, 350], [700, 350]])
-detail.text(530, 430, ["Public", "HTTPS"], 19, 400, 100)
+detail.text(530, 430, ["A2A 1.0", "HTTPS"], 19, 400, 100)
 
 detail.rect(680, 465, 1265, 300, "none", "#7aaed6", true)
 detail.text(700, 477, "VNET  /  ISOLATED SUBNETS", 19, 600, 1100)
-detail.box(700, 530, 340, 180, "Flex subnet", ["Dedicated service delegation", "VNet integration: outbound", "Gateway managed identity"], null, null, "#eaf4ff")
+detail.box(700, 530, 340, 180, "APIM subnet", ["Dedicated, no delegation", "External VNet injection", "APIM managed identity"], null, null, "#eaf4ff")
 detail.box(1100, 530, 240, 180, "Foundry PE", ["Private-endpoint subnet", "account group", "Private HTTPS"], "private-link", null, "#edf7f6")
 detail.box(1420, 530, 420, 180, "Foundry Hosted agent", ["Dedicated injected subnet", "Explicit platform caller gate", "Native Studio A2A provider"], "foundry", 3, "#eaf4ff")
 detail.arrow([[870, 430], [870, 530]], palette.private)
-detail.text(890, 436, "VNet integration", 18, 400, 200)
+detail.text(890, 436, "VNet injection", 18, 400, 200)
 detail.arrow([[1040, 620], [1100, 620]], palette.private)
 detail.arrow([[1220, 530], [1220, 350], [1420, 350]], palette.private)
 detail.text(1240, 385, ["Private HTTPS", "Entra bearer"], 18, 400, 165)
@@ -215,8 +215,8 @@ detail.text(75, 915, [
 
 detail.text(700, 803, "ADDITIONAL PRIVATE-ENDPOINT ATTACHMENTS  /  SAME PE SUBNET", 19, 600, 1220)
 const services = [
-  { x: 700, pe: "Host Blob PE", title: "Host storage", icon: "storage", body: ["Private Blob package", "Gateway managed identity"] },
-  { x: 1020, pe: "Source Blob PE", title: "Source storage", icon: "storage", body: ["Synthetic source documents", "Protected token state"] },
+  { x: 700, pe: "Host Blob PE", title: "Host storage", icon: "storage", body: ["Retained rollback package", "Removal not authorized"] },
+  { x: 1020, pe: "Source Blob PE", title: "Source storage", icon: "storage", body: ["Synthetic source documents", "Operator-only publication"] },
   { x: 1340, pe: "Registry PE", title: "Container registry", icon: "acr", body: ["Private ACR + image digest", "Actual agent AcrPull"] },
   { x: 1660, pe: "Monitor PE", title: "Azure Monitor", icon: "monitor", body: ["AMPLS + App Insights", "Private Log Analytics"] },
 ]
@@ -231,8 +231,8 @@ for (const service of services) {
 detail.rect(45, 1170, 2275, 350, "none", "#d4c3e5")
 detail.text(75, 1190, "IDENTITY EXCHANGE  /  SUPPLEMENTS STAGE 3, NOT A SECOND BUSINESS ROUTE", 20, 600, 2190)
 detail.box(80, 1265, 500, 165, "Hosted managed identity", ["Requests an approved provider token", "Returns to the numbered A2A route"], "foundry")
-detail.box(800, 1265, 500, 165, "Gateway token broker", ["Public listener + Connection.Use role", "Reads protected refresh state privately"], "functions")
-detail.box(1520, 1265, 500, 165, "Microsoft Entra ID", ["Approved guest OAuth consent", "Delegated MCS.InvokeAsA2A"], null)
+detail.box(800, 1265, 500, 165, "APIM token API (target)", ["Router identity only, never local client", "Credential Manager PKCE proof pending"], null)
+detail.box(1520, 1265, 500, 165, "Microsoft Entra ID", ["Fixed Paulo connection + fresh consent", "Delegated MCS.InvokeAsA2A"], null)
 detail.arrow([[580, 1310], [800, 1310]], palette.auth, true)
 detail.text(615, 1268, "MI / role token", 19, 400, 170)
 detail.arrow([[1300, 1310], [1520, 1310]], palette.auth, true)
@@ -245,11 +245,11 @@ detail.text(2050, 1280, ["Tokens stay protected.", "Studio and Entra", "remain p
 
 detail.rect(45, 1570, 2275, 535, "none", "#bdc8d6", true)
 detail.text(75, 1590, "OPERATOR AND DEPLOYMENT  /  SEPARATE FROM THE RUNTIME REQUEST", 20, 600, 2190)
-detail.box(80, 1660, 500, 160, "Operator workstation", ["Entra-authenticated restricted routes", "Public ARM → persistent ACR task"], null)
-detail.box(800, 1660, 500, 160, "Gateway publication worker", ["Runs inside the integrated VNet", "Pinned manifest, extensions, and image"], "functions")
+detail.box(80, 1660, 500, 160, "Authorized operator", ["Separate from public business route", "Private execution acceptance pending"], null)
+detail.box(800, 1660, 500, 160, "Private operator worker", ["APIM does not run publication", "Retain Function until path is proven"], null)
 detail.box(1520, 1660, 500, 160, "Private Azure services", ["Foundry publication + Blob sources", "Registry task MI + reviewed bypass"], "foundry")
 detail.arrow([[580, 1740], [800, 1740]], palette.admin, true)
-detail.text(605, 1690, "Public HTTPS", 19, 400, 190)
+detail.text(605, 1690, "Operator-only", 19, 400, 190)
 detail.arrow([[1300, 1740], [1520, 1740]], palette.private, true)
 detail.text(1310, 1690, "Private HTTPS", 19, 400, 200)
 detail.box(80, 1870, 500, 150, "Optional direct operator path", ["Private diagnostics only", "Not required for the main runtime"], null)
@@ -257,7 +257,7 @@ detail.box(800, 1870, 500, 150, "Azure VPN gateway", ["Entra-authenticated point
 detail.box(1520, 1870, 500, 150, "Private endpoints + DNS", ["Scoped private DNS for the operator", "Direct endpoint access when authorized"], "private-link")
 detail.arrow([[580, 1945], [800, 1945]], palette.admin, true)
 detail.arrow([[1300, 1945], [1520, 1945]], palette.admin, true)
-detail.text(75, 2055, "No site-to-site AWS–Azure tunnel. NSGs and outbound policies are deployment-owned. The HTTP-only baseline has no Queue/Table endpoints.", 19, 400, 2190)
+detail.text(75, 2055, "No AWS runtime or business-route VPN. Private operator connectivity and NSG/DNS gates require independent acceptance before Function retirement.", 19, 400, 2190)
 
 detail.text(60, 2150, "CONNECTIVITY LEGEND", 18, 600, 500)
 for (const [x, label, color, dashed] of [

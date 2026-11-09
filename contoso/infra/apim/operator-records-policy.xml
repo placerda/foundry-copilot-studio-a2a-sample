@@ -1,0 +1,60 @@
+<policies>
+  <inbound>
+    <base />
+    <set-method>GET</set-method>
+    <set-body>@(String.Empty)</set-body>
+    <rewrite-uri template="__ROUTER_PATH__" copy-unmatched-params="false" />
+  </inbound>
+  <backend>
+    <base />
+  </backend>
+  <outbound>
+    <set-body>@{
+      var status = context.Response.StatusCode;
+      try {
+        var raw = context.Response.Body.As&lt;string&gt;(preserveContent: true);
+        if (status != 200 || Encoding.UTF8.GetByteCount(raw) &gt; 65536) {
+          return JsonConvert.SerializeObject(new { upstream_status = status, shape = "unverified" });
+        }
+        var body = JToken.Parse(raw) as JObject;
+        var latest = body == null ? null : body["versions"]?["latest"] as JObject;
+        var definition = latest == null ? null : latest["definition"] as JObject;
+        var version = latest == null ? null : latest["version"];
+        if (definition == null || (string)definition["kind"] != "hosted"
+          || version == null || version.Type != JTokenType.String
+          || !Regex.IsMatch((string)version, "^[0-9]{1,20}$")) {
+          return JsonConvert.SerializeObject(new { upstream_status = status, shape = "unrecognized-definition" });
+        }
+        var environment = definition["environment_variables"] as JObject;
+        var configured = environment == null ? null : environment["CONTOSO_PLATFORM_CALLER_IDS"];
+        if (configured == null || configured.Type != JTokenType.String
+          || ((string)configured).Length &gt; 4096) {
+          return JsonConvert.SerializeObject(new { upstream_status = status, shape = "unverified-callers" });
+        }
+        var callers = JToken.Parse((string)configured) as JArray;
+        if (callers == null || callers.Count &gt; 16
+          || callers.Any(c =&gt; c.Type != JTokenType.String
+            || ((string)c).Length == 0 || ((string)c).Length &gt; 256)) {
+          return JsonConvert.SerializeObject(new { upstream_status = status, shape = "unverified-callers" });
+        }
+        return JsonConvert.SerializeObject(new {
+          upstream_status = status, shape = "verified-hosted-definition",
+          agent_version = (string)version, configured_caller_count = callers.Count,
+          apim_caller_configured = callers.Any(c =&gt; (string)c == "__APIM_PRINCIPAL__")
+        });
+      } catch {
+        return JsonConvert.SerializeObject(new { upstream_status = status, shape = "unparseable" });
+      }
+    }</set-body>
+    <set-variable name="routerAdmissionMetadata" value="@(context.Response.Body.As&lt;string&gt;(preserveContent: true))" />
+    <return-response>
+      <set-status code="200" reason="Diagnostic completed" />
+      <set-header name="Content-Type" exists-action="override"><value>application/json</value></set-header>
+      <set-header name="Cache-Control" exists-action="override"><value>no-store</value></set-header>
+      <set-body>@((string)context.Variables["routerAdmissionMetadata"])</set-body>
+    </return-response>
+  </outbound>
+  <on-error>
+    <base />
+  </on-error>
+</policies>

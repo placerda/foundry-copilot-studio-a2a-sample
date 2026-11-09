@@ -8,9 +8,14 @@ from typing import Literal, TypedDict
 
 import requests
 
-from config import CONTOSO_DEADLINE_SECONDS, CONTOSO_MIN_REMAINING_MS, CONTOSOSettings, gateway_endpoint
-from errors import ChatFailure, dependency, invalid
-from validation import bound_output, unique_object
+if __package__:
+    from .config import CONTOSO_DEADLINE_SECONDS, CONTOSO_MIN_REMAINING_MS, CONTOSOSettings, gateway_endpoint
+    from .errors import ChatFailure, dependency, invalid
+    from .validation import bound_output, unique_object
+else:
+    from config import CONTOSO_DEADLINE_SECONDS, CONTOSO_MIN_REMAINING_MS, CONTOSOSettings, gateway_endpoint
+    from errors import ChatFailure, dependency, invalid
+    from validation import bound_output, unique_object
 
 MAX_DOCUMENT_BYTES = 262144
 TOKEN_TIMEOUT_SECONDS = 8
@@ -84,7 +89,7 @@ class Requester:
     def __init__(self, settings: CONTOSOSettings, session_factory=requests.Session, *,
                  endpoint_path="/api/invoke"):
         self.settings = settings
-        if gateway_endpoint(settings.gateway_url, endpoint_path) != settings.gateway_url:
+        if gateway_endpoint(settings.gateway_url, endpoint_path, settings.approved_apim_host) != settings.gateway_url:
             raise ValueError("Invalid CONTOSO endpoint")
         self.session_factory = session_factory
         self._lock = threading.Lock()

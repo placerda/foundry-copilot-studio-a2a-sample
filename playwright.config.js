@@ -1,7 +1,6 @@
 import { defineConfig } from "@playwright/test";
 
 const port = Number(process.env.CONTOSO_TEST_PORT || 8000);
-
 export default defineConfig({
   testDir: "./frontend/tests",
   testMatch: "**/*.spec.js",

@@ -7,7 +7,6 @@ import logging
 import os
 from pathlib import Path
 import re
-import tempfile
 
 import azure.functions as func
 from azure.core.exceptions import AzureError
@@ -19,6 +18,7 @@ from contoso.configuration import identifier, required
 from contoso.identity import EntraAuthenticator, IdentitySettings
 from contoso.gateway_probe import SERVICES, probe_service
 from contoso.publication import Document, OperatorConfig, PublicationFailure, production_executor
+from contoso.publication.operator_settings import publication_environment, publication_settings, publication_workspace
 
 
 def _unique(pairs):
@@ -37,9 +37,12 @@ def operator_config(env, *, package=None):
         raise PublicationFailure("publication_manifest_changed")
     manifest = json.loads(manifest_bytes)
     bindings = json.loads(required(env, "CONTOSO_PUBLICATION_BINDINGS"), object_pairs_hook=_unique)
+    override_path = package / "operator-settings.json"
+    overrides = json.loads(override_path.read_bytes(), object_pairs_hook=_unique) if override_path.exists() else None
+    settings = publication_settings(bindings, env, overrides)
     return OperatorConfig(
         package_root=package,
-        workspace_root=Path(tempfile.gettempdir()) / "contoso-pub",
+        workspace_root=publication_workspace(settings),
         azure_yaml_sha256=manifest["azure_yaml_sha256"],
         azd_relative_path="tools/azd",
         azd_sha256=manifest["azd_sha256"],
@@ -63,7 +66,7 @@ def operator_config(env, *, package=None):
             )
             for name in ("knowledge-returnables.md", "supplier-delivery-terms.md")
         ),
-        environment_values=tuple(bindings["environment_values"].items()),
+        environment_values=publication_environment(bindings, settings),
     )
 
 

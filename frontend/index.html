@@ -44,6 +44,16 @@
       </details>
     </aside>
     <section class="chat-panel" aria-label="Collaboration workspace">
+      <section class="identity-panel" aria-label="Identity scenario">
+        <label for="identity-mode">Studio identity scenario</label>
+        <select id="identity-mode" aria-describedby="identity-reason" disabled>
+          <option value="user-delegation" disabled>1. End-to-end user identity — not configured</option>
+          <option value="service-to-service" disabled>2. SDK Service-to-Service — not configured</option>
+          <option value="shared-delegated" selected>3. Shared delegated connection</option>
+        </select>
+        <p id="identity-reason" role="status">Checking availability…</p>
+        <p id="identity-callers">App user: sign in. Studio identity: shared connection (unverified).</p>
+      </section>
       <header class="chat-heading"><div><h2>Conversation</h2><p>This conversation is stored only in this page's memory.</p></div>
         <p id="auth-status" role="status">Initializing authentication...</p>
       </header>
@@ -76,13 +86,13 @@
       <h2 id="connection-title">How the agents collaborate</h2>
       <p class="connection-intro">Foundry routes your question. When a capability matches, it asks Copilot Studio for an evidence-backed answer.</p>
       <figure class="connection-diagram">
-        <ol class="agent-flow" aria-label="Browser uses HTTPS and JSON to AWS Lambda. Lambda reaches Foundry through the Gateway using A2A 1.0. Foundry communicates with Copilot Studio using A2A 1.0.">
+        <ol class="agent-flow" aria-label="The browser uses loopback HTTP and JSON to the local Python requester. The requester reaches private Foundry through APIM using A2A 1.0 over HTTPS. Foundry communicates with Copilot Studio using A2A 1.0.">
           <li>
             <svg class="product-icon browser-icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="8" width="40" height="32" rx="3"/><path d="M4 17h40M10 12h2m3 0h2m3 0h2M15 25l-5 4 5 4m18-8 5 4-5 4m-7-9-4 18"/></svg>
-            <h3>Your question</h3><p>Browser → AWS Lambda requester.</p><p class="client-protocol">HTTPS / JSON</p>
+            <h3>Your question</h3><p>Browser → local Python requester.</p><p class="client-protocol">Loopback HTTP / JSON</p>
           </li>
           <li>
-            <span class="flow-link"><span aria-hidden="true">→</span><strong>A2A 1.0</strong><small>via Gateway</small></span>
+            <span class="flow-link"><span aria-hidden="true">→</span><strong>A2A 1.0 / HTTPS</strong><small>via APIM</small></span>
             <img class="product-icon" src="./assets/foundry.svg" width="40" height="40" alt="">
             <h3>Microsoft Foundry</h3><p>The private agent finds<br>the matching capability.</p>
           </li>
@@ -96,9 +106,8 @@
       </figure>
       <details class="access-path">
         <summary>How this browser reaches the private agents</summary>
-        <p>The browser calls the AWS Lambda requester using HTTPS with JSON. Lambda sends A2A 1.0 messages through the Azure Functions Gateway to the private Foundry agent. Foundry also uses A2A 1.0 to call Copilot Studio.</p>
-        <p>Both A2A connections use JSON-RPC 2.0 over HTTPS. The Gateway preserves the A2A message through Foundry's HTTP passthrough, rather than converting it into a Responses API call.</p>
-        <p>Lambda and the Gateway provide access, not a separate conversational agent.</p>
+        <p>Your browser sends the question to the local Python requester. The requester uses authenticated APIM to reach private Foundry, then Copilot Studio.</p>
+        <p>Cloud connections use A2A 1.0 / JSON-RPC 2.0 over HTTPS. The requester provides access, not a separate conversational agent.</p>
       </details>
       <p class="diagram-note">Architecture overview, not a live execution trace. Actual sources and execution details appear with each response.</p>
     </section>

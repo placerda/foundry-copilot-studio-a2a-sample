@@ -21,7 +21,7 @@ ARM_SCOPE = "https://management.azure.com/.default"
 ACR_PUSH_ROLE = "8311e382-0749-4cb8-b61a-304f252e45ec"
 
 
-def source_archive(root: Path) -> bytes:
+def source_archive(root: Path, *, sdk_proof: bool = False) -> bytes:
     paths = [
         root / ".dockerignore",
         root / "contoso" / "Dockerfile",
@@ -46,7 +46,13 @@ def source_archive(root: Path) -> bytes:
             info = zipfile.ZipInfo(path.relative_to(root).as_posix(), date_time=(1980, 1, 1, 0, 0, 0))
             info.compress_type = zipfile.ZIP_DEFLATED
             info.external_attr = 0o644 << 16
-            archive.writestr(info, path.read_bytes())
+            data = path.read_bytes()
+            if sdk_proof and path == root / "contoso" / "Dockerfile":
+                command = b'CMD ["python", "-m", "contoso.entrypoint"]'
+                if data.count(command) != 1:
+                    raise ValueError("The reviewed runtime command changed")
+                data = data.replace(command, b'CMD ["python", "-m", "contoso.providers.sdk_proof"]')
+            archive.writestr(info, data)
     payload = buffer.getvalue()
     if len(payload) > 524288:
         raise ValueError("The reviewed image context exceeded its byte limit")
@@ -99,7 +105,7 @@ class Arm:
         return response.json()
 
 
-def build(arm: Arm, acr_id: str, root: Path) -> dict:
+def build(arm: Arm, acr_id: str, root: Path, *, sdk_proof: bool = False) -> dict:
     match = re.fullmatch(
         r"/subscriptions/([0-9a-f-]{36})/resourceGroups/(rg-contoso-[a-z0-9-]+)/"
         r"providers/Microsoft.ContainerRegistry/registries/(contoso[a-z0-9]+)", acr_id,
@@ -110,7 +116,7 @@ def build(arm: Arm, acr_id: str, root: Path) -> dict:
     registry = arm.request("GET", acr_id, api_version=ACR_API)
     if registry["properties"]["publicNetworkAccess"] != "Disabled":
         raise RuntimeError("The reviewed registry must retain disabled public access")
-    source = source_archive(root)
+    source = source_archive(root, sdk_proof=sdk_proof)
     tag = hashlib.sha256(source).hexdigest()
     task_id = acr_id + "/tasks/" + TASK_NAME
     task = arm.request("PUT", task_id, api_version=ACR_API, payload={
@@ -131,18 +137,23 @@ def build(arm: Arm, acr_id: str, root: Path) -> dict:
     })
     principal_id = str(UUID(task["identity"]["principalId"]))
     assignment_id = str(uuid5(NAMESPACE_URL, task_id + "/" + ACR_PUSH_ROLE))
-    arm.request(
-        "PUT", acr_id + "/providers/Microsoft.Authorization/roleAssignments/" + assignment_id,
-        api_version="2022-04-01",
-        payload={"properties": {
+    role_path = acr_id + "/providers/Microsoft.Authorization/roleAssignments/" + assignment_id
+    expected_role = {
             "principalId": principal_id,
             "principalType": "ServicePrincipal",
             "roleDefinitionId": (
                 f"/subscriptions/{subscription}/providers/Microsoft.Authorization/"
                 f"roleDefinitions/{ACR_PUSH_ROLE}"
             ),
-        }},
-    )
+    }
+    if sdk_proof:
+        assigned = arm.request("GET", role_path, api_version="2022-04-01")["properties"]
+        if any(assigned.get(key, "").casefold() != value.casefold()
+               for key, value in expected_role.items()):
+            raise RuntimeError("The isolated SDK build requires the existing exact task AcrPush binding")
+    else:
+        arm.request("PUT", role_path, api_version="2022-04-01",
+                    payload={"properties": expected_role})
     run = arm.request("POST", acr_id + "/scheduleRun", api_version=ACR_API, payload={
         "type": "TaskRunRequest", "taskId": task_id, "isArchiveEnabled": False,
     })
@@ -178,9 +189,11 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--acr-id", required=True)
     parser.add_argument("--tenant-id", required=True)
+    parser.add_argument("--sdk-proof", action="store_true")
     args = parser.parse_args()
     credential = AzureCliCredential(tenant_id=str(UUID(args.tenant_id)))
-    result = build(Arm(credential), args.acr_id, Path(__file__).resolve().parents[2])
+    result = build(Arm(credential), args.acr_id, Path(__file__).resolve().parents[2],
+                   sdk_proof=args.sdk_proof)
     print(json.dumps(result, indent=2))
 
 

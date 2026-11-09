@@ -10,10 +10,16 @@ from uuid import uuid4
 
 import requests
 
-from contoso_requester import CONTOSOOptions, MAX_DOCUMENT_BYTES, Requester, text, unavailable, validate_result
-from config import CONTOSOSettings
-from errors import invalid
-from validation import unique_object
+if __package__:
+    from .contoso_requester import CONTOSOOptions, MAX_DOCUMENT_BYTES, Requester, text, unavailable, validate_result
+    from .config import CONTOSOSettings
+    from .errors import invalid
+    from .validation import unique_object
+else:
+    from contoso_requester import CONTOSOOptions, MAX_DOCUMENT_BYTES, Requester, text, unavailable, validate_result
+    from config import CONTOSOSettings
+    from errors import invalid
+    from validation import unique_object
 
 NATIVE_OPTIONS: CONTOSOOptions = {"integration": "a2a", "studio_variant": "copilot-harness"}
 

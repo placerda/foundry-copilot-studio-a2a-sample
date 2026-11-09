@@ -3,8 +3,12 @@ import binascii
 import json
 import re
 
-from config import MAX_BODY_BYTES, MAX_CONTENT_LENGTH
-from errors import ChatFailure, invalid
+if __package__:
+    from .config import MAX_BODY_BYTES, MAX_CONTENT_LENGTH
+    from .errors import ChatFailure, invalid
+else:
+    from config import MAX_BODY_BYTES, MAX_CONTENT_LENGTH
+    from errors import ChatFailure, invalid
 
 
 def headers_of(event):
@@ -29,6 +33,25 @@ def unique_object(pairs):
             raise ValueError("Duplicate JSON field")
         result[name] = value
     return result
+
+
+def decode_json(raw, headers, allow_identity_mode=False):
+    media = headers.get("content-type", "")
+    if (not re.fullmatch(r"application/json(?:\s*;\s*charset=utf-8)?", media, re.IGNORECASE)
+            or "content-encoding" in headers or len(raw) > MAX_BODY_BYTES):
+        raise invalid()
+    try:
+        payload = json.loads(raw.decode("utf-8"), object_pairs_hook=unique_object,
+                             parse_constant=lambda _: (_ for _ in ()).throw(ValueError()))
+        if not isinstance(payload, dict):
+            raise ValueError
+        base_fields = set(payload) - ({"identity_mode"} if allow_identity_mode else set())
+        if base_fields not in (
+                {"messages"}, {"messages", "contoso_options"}):
+            raise ValueError
+        return payload
+    except (ValueError, UnicodeError, RecursionError):
+        raise invalid() from None
 
 
 def decode_transport(event):

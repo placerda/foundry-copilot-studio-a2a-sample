@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 const question = "We propose delivering 300 of 500 units Friday and the remaining 200 Monday. Does this satisfy the buyer's terms?";
 const noMatchQuestion = "Approve the supplier's partial delivery proposal.";
-const functionURL = "https://synthetic.lambda-url.us-east-2.on.aws/**";
+const functionURL = "**/api/chat";
 
 function result(variant = "copilot-harness") {
   return { answer: "Literal actual response <img src=x onerror=alert(1)>.",
@@ -32,7 +32,7 @@ test("supplier–buyer branding preserves native route binding labels", async ({
   await loginContoso(page);
   await expect(page).toHaveTitle("Supplier–Buyer Agent Collaboration");
   await expect(page.getByRole("heading", { name: "Supplier–Buyer Agent Collaboration" })).toBeVisible();
-  await expect(page.locator("select")).toHaveCount(0);
+  await expect(page.locator("select")).toHaveCount(1);
   await expect(page.locator(".connection-panel")).toContainText("Microsoft Foundry");
   await expect(page.locator(".connection-panel")).toContainText("Copilot Studio");
   await expect(page.locator("body"))
@@ -42,7 +42,7 @@ test("supplier–buyer branding preserves native route binding labels", async ({
 test("disabled or malformed public flag never enables a standalone chat fallback", async ({ page }) => {
   await page.addInitScript(() => { window.contosoTestEnabled = false; });
   await page.goto("/");
-  await expect(page.locator("select")).toHaveCount(0);
+  await expect(page.locator("select")).toHaveCount(1);
   await expect(page.locator(".connection-panel")).toBeVisible();
   await expect(page.locator("#error")).toContainText("Agent network is not configured");
   await page.locator("#login").click();
@@ -81,7 +81,7 @@ for (const integration of ["a2a"]) {
       await expect(page.locator(".content").last()).toHaveText(result(variant).answer);
       await expect(page.locator(".contoso-metadata")).not.toContainText("CIN-DEMO-CONSUMER-001");
       expect(requests).toEqual([{ messages: [{ role: "user", content: question }],
-        contoso_options: { integration, studio_variant: variant } }]);
+        contoso_options: { integration, studio_variant: variant }, identity_mode: "shared-delegated" }]);
       expect(JSON.stringify(requests)).not.toContain("tenant");
       expect(JSON.stringify(requests)).not.toContain("client_secret");
       await page.locator("#reset").click();
@@ -189,7 +189,7 @@ test("Contoso logout invalidates token await and prevents late network request",
   await expect(page.locator("#processing")).toBeEmpty();
   await expect(page.locator("#send")).toBeDisabled();
   await expect(page.locator("#messages article")).toHaveCount(0);
-  await expect(page.locator("select")).toHaveCount(0);
+  await expect(page.locator("select")).toHaveCount(1);
   expect(calls).toBe(0);
 });
 
@@ -212,7 +212,7 @@ test("Contoso reset disposes late response and limit notice and preserves the fi
   await page.locator("#draft").fill("new");
   await page.locator("#send").click();
   await expect(page.locator(".limit")).toHaveCount(1);
-  await expect(page.locator("select")).toHaveCount(0);
+  await expect(page.locator("select")).toHaveCount(1);
   await page.locator("#reset").click();
   await expect(page.locator("#messages article, .limit")).toHaveCount(0);
 });
@@ -236,5 +236,6 @@ test("injected obsolete controls cannot change the fixed native A2A route", asyn
   await page.locator("#send").click();
   await expect(page.locator(".contoso-metadata")).toBeVisible();
   expect(requests).toEqual([{ messages: [{ role: "user", content: question }],
-    contoso_options: { integration: "a2a", studio_variant: "copilot-harness" } }]);
+    contoso_options: { integration: "a2a", studio_variant: "copilot-harness" },
+    identity_mode: "shared-delegated" }]);
 });
