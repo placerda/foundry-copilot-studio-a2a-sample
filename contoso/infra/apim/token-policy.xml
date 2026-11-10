@@ -30,7 +30,7 @@
       </when>
     </choose>
     <rate-limit-by-key calls="30" renewal-period="60" counter-key="shared-studio-token-router" />
-    <get-authorization-context provider-id="contoso-studio-v2" authorization-id="shared-paulo" context-variable-name="studioConnection" identity-type="managed" ignore-error="true" />
+    <get-authorization-context provider-id="contoso-studio-v2-pkce" authorization-id="shared-paulo" context-variable-name="studioConnection" identity-type="managed" ignore-error="true" />
     <choose>
       <when condition="@(!context.Variables.ContainsKey(&quot;studioConnection&quot;) || context.Variables[&quot;studioConnection&quot;] == null)">
         <return-response>

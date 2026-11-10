@@ -39,7 +39,7 @@ def test_credential_access_uses_apim_identity_and_fixed_connection_not_browser_j
     root = ET.parse(POLICY).getroot()
     context = root.find("./inbound/get-authorization-context")
     assert context.attrib == {
-        "provider-id": "contoso-studio-v2", "authorization-id": "shared-paulo",
+        "provider-id": "contoso-studio-v2-pkce", "authorization-id": "shared-paulo",
         "context-variable-name": "studioConnection", "identity-type": "managed",
         "ignore-error": "true",
     }

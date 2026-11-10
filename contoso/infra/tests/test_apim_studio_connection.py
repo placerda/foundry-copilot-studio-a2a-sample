@@ -72,3 +72,4 @@ def test_fixed_connection_ids_match_the_candidate_token_policy():
     assert f"name: '{context.attrib['provider-id']}'" in text
     assert f"name: '{context.attrib['authorization-id']}'" in text
     assert context.attrib["identity-type"] == "managed"
+    assert "name: 'contoso-studio-v2'" not in text

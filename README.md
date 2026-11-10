@@ -117,6 +117,11 @@ Select the PKCE provider at creation. A live in-place change from `oauth2` to
 Do not treat deployment success as proof of that change or proceed to consent.
 Recreating an existing candidate requires explicit deletion approval, or a new
 provider name and matching token-policy binding must be prepared and validated.
+The template and isolated token policy use `contoso-studio-v2-pkce` for an
+additive PKCE candidate. This avoids deleting or modifying an existing
+`contoso-studio-v2` candidate. The original remains unused and unauthenticated,
+and any cleanup requires approval. Creating the parallel connection does not
+deploy the token API, change the working Router or establish owner consent.
 
 ### SDK S2S credential attempt â€” November 9, 2026
 

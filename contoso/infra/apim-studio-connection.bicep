@@ -20,7 +20,7 @@ resource apim 'Microsoft.ApiManagement/service@2024-05-01' existing = {
 
 resource provider 'Microsoft.ApiManagement/service/authorizationProviders@2024-05-01' = {
   parent: apim
-  name: 'contoso-studio-v2'
+  name: 'contoso-studio-v2-pkce'
   properties: {
     displayName: 'Shared Studio delegated connection'
     identityProvider: 'oauth2pkce'
