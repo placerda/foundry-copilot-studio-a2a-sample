@@ -450,7 +450,11 @@ class OperatorConfig:
                         )):
                     raise ValueError("Invalid native STUDIO Harness A2A endpoint")
             elif key == "CONTOSO_GATEWAY_URL":
-                endpoint = _runtime_url(value, ".azurewebsites.net")
+                suffix = (
+                    (".azurewebsites.net", ".azure-api.net")
+                    if router_scope == "studio-harness" else ".azurewebsites.net"
+                )
+                endpoint = _runtime_url(value, suffix)
                 if endpoint.path not in ("", "/"):
                     raise ValueError("Gateway URL must identify the Gateway origin")
             else:

@@ -141,6 +141,15 @@ perform consent, mark the connection authorized or establish token shape.
 Owner, tenant, audience, scope and expiry must be verified before exposing a
 token facade. Refresh behavior and actual Studio acceptance through that
 facade must pass before switching the Router.
+Source preparation now allows an APIM HTTPS origin in `CONTOSO_GATEWAY_URL`
+only when `CONTOSO_ROUTER_SCOPE=studio-harness`, in both runtime composition
+and publication validation. Use a bare HTTPS origin without an explicit
+port, credentials, query or fragment. The full catalog still requires the retained
+Function broker, because this facade releases only the fixed Harness
+connection. Keep the existing API audience and managed identity. This
+compatibility does not change any deployed version or establish successful
+Router token release. A separately validated candidate and live acceptance
+are required before cutover.
 Microsoft's [provider reference](https://github.com/Azure/APIManagement-Authorizations/blob/main/docs/identityproviders.md)
 identifies Generic OAuth 2 with PKCE as `"identityProvider": "oauth2pkce"`.
 The non-PKCE `"oauth2"` provider is not interchangeable: a real server-issued

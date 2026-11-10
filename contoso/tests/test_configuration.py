@@ -241,7 +241,12 @@ def test_harness_only_catalog_has_no_standard_or_knowledge_route(router_env):
         catalog.lookup("unapproved-service", "supplier-delivery-terms", variant="copilot-harness")
 
 
-def test_harness_only_host_needs_no_deferred_configuration_or_operator_credentials(monkeypatch, router_env):
+@pytest.mark.parametrize("gateway_url", [
+    "https://approved.azurewebsites.net", "https://approved.azure-api.net",
+])
+def test_harness_only_host_needs_no_deferred_configuration_or_operator_credentials(
+    monkeypatch, router_env, gateway_url,
+):
     from contoso import configuration, entrypoint
 
     class Credential:
@@ -252,6 +257,11 @@ def test_harness_only_host_needs_no_deferred_configuration_or_operator_credentia
         pytest.fail("Deferred providers must not be constructed in Harness-only scope")
 
     captured = {}
+    token_client = entrypoint.ProviderTokens
+
+    def tokens(credential, **kwargs):
+        captured["tokens"] = token_client(credential, **kwargs)
+        return captured["tokens"]
 
     class Host:
         def __init__(self, runtime, **kwargs):
@@ -265,9 +275,40 @@ def test_harness_only_host_needs_no_deferred_configuration_or_operator_credentia
     monkeypatch.setattr(entrypoint, "StandardSDKAdapter", forbidden)
     monkeypatch.setattr(entrypoint, "FoundryResponsesTransport", forbidden)
     monkeypatch.setattr(entrypoint, "HostedRouter", Host)
-    assert build_host(harness_only_env(router_env), Credential()) is not None
+    monkeypatch.setattr(entrypoint, "ProviderTokens", tokens)
+    env = {**harness_only_env(router_env), "CONTOSO_GATEWAY_URL": gateway_url}
+    assert build_host(env, Credential()) is not None
     assert set(captured["runtime"].providers) == {"studio-copilot-harness"}
     assert captured["fixed_variant"].value == "copilot-harness"
+    assert captured["tokens"].gateway_url == gateway_url
+    assert captured["tokens"].gateway_api_id == env["CONTOSO_ENTRA_API_CLIENT_ID"]
+
+
+@pytest.mark.parametrize("gateway_url", [
+    "http://approved.azure-api.net",
+    "https://approved.azure-api.net.evil.example",
+    "https://evil.example",
+    "https://approved.azure-api.net/api/connections/token",
+    "https://user:invalid@approved.azure-api.net",
+    "https://approved.azure-api.net?unexpected=value",
+    "https://approved.azure-api.net#fragment",
+    "https://approved.azure-api.net:443",
+    "https://approved.azure-api.net:8443",
+])
+def test_harness_only_token_origin_rejects_unsafe_apim_configuration(router_env, gateway_url):
+    class Credential:
+        def get_token(self, *args):
+            pytest.fail("Invalid configuration cannot acquire credentials")
+
+    env = {**harness_only_env(router_env), "CONTOSO_GATEWAY_URL": gateway_url}
+    with pytest.raises(CatalogError):
+        build_host(env, Credential())
+
+
+def test_catalog_does_not_use_the_harness_only_apim_token_facade(router_env):
+    router_env["CONTOSO_GATEWAY_URL"] = "https://approved.azure-api.net"
+    with pytest.raises(CatalogError, match="unapproved host"):
+        RouterSettings.from_environment(router_env)
 
 
 @pytest.mark.parametrize("name", [

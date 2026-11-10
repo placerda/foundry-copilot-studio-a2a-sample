@@ -52,6 +52,39 @@ def test_harness_only_publication_does_not_require_a_deferred_standard_schema(co
 
 
 @pytest.mark.parametrize("scope", ["catalog", "studio-harness"])
+@pytest.mark.parametrize("gateway_url", [
+    "https://approved.azurewebsites.net", "https://approved.azure-api.net",
+])
+def test_publication_admits_apim_tokens_only_for_harness_scope(config, scope, gateway_url):
+    values = dict(config.environment_values)
+    values.update(CONTOSO_ROUTER_SCOPE=scope, CONTOSO_GATEWAY_URL=gateway_url)
+    if scope == "catalog" and gateway_url.endswith(".azure-api.net"):
+        with pytest.raises(ValueError):
+            replace(config, environment_values=tuple(values.items()))
+    else:
+        configured = replace(config, environment_values=tuple(values.items()))
+        assert configured.values()["CONTOSO_GATEWAY_URL"] == gateway_url
+
+
+@pytest.mark.parametrize("gateway_url", [
+    "http://approved.azure-api.net",
+    "https://approved.azure-api.net.evil.example",
+    "https://evil.example",
+    "https://approved.azure-api.net/api/connections/token",
+    "https://user:invalid@approved.azure-api.net",
+    "https://approved.azure-api.net?unexpected=value",
+    "https://approved.azure-api.net#fragment",
+    "https://approved.azure-api.net:443",
+    "https://approved.azure-api.net:8443",
+])
+def test_publication_rejects_unsafe_harness_token_origins(config, gateway_url):
+    values = dict(config.environment_values)
+    values.update(CONTOSO_ROUTER_SCOPE="studio-harness", CONTOSO_GATEWAY_URL=gateway_url)
+    with pytest.raises(ValueError):
+        replace(config, environment_values=tuple(values.items()))
+
+
+@pytest.mark.parametrize("scope", ["catalog", "studio-harness"])
 @pytest.mark.parametrize("port", ["", ":443"])
 @pytest.mark.parametrize("query", ["api-version=v1", "api-version=2026-03-01-preview"])
 def test_business_publication_preserves_native_knowledge_version_query(config, scope, port, query):

@@ -34,7 +34,7 @@ def identifier(env: Mapping[str, str], name: str) -> str:
         raise CatalogError(f"Deployment setting {name} must be a UUID") from None
 
 
-def endpoint(env: Mapping[str, str], name: str, suffix: str) -> str:
+def endpoint(env: Mapping[str, str], name: str, suffix: str | tuple[str, ...]) -> str:
     value = required(env, name).rstrip("/")
     _https_origin(value)
     if not urlsplit(value).hostname.endswith(suffix):
@@ -86,9 +86,14 @@ class HarnessRouterSettings:
 
     @classmethod
     def from_environment(cls, env: Mapping[str, str]):
+        gateway_url = endpoint(
+            env, "CONTOSO_GATEWAY_URL", (".azurewebsites.net", ".azure-api.net"),
+        )
+        if _https_origin(gateway_url) != gateway_url or urlsplit(gateway_url).port is not None:
+            raise CatalogError("The token gateway requires an HTTPS origin without an explicit port")
         return cls(
             tenant_id=identifier(env, "CONTOSO_ENTRA_TENANT_ID"),
-            gateway_url=endpoint(env, "CONTOSO_GATEWAY_URL", ".azurewebsites.net"),
+            gateway_url=gateway_url,
             gateway_api_id=identifier(env, "CONTOSO_ENTRA_API_CLIENT_ID"),
             harness_endpoint=endpoint(env, "CONTOSO_STUDIO_HARNESS_ENDPOINT", ".powerplatform.com"),
             callers=platform_callers(env),
