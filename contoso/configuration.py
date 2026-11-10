@@ -170,7 +170,7 @@ class RouterSettings:
                 sources=(
                     SourceMetadata(
                         "CONTOSO-DEMO-KNOWLEDGE-001", "knowledge-demo", "1",
-                        "Returnable packaging adoption in neighborhood stores",
+                        "Supplier–buyer reusable transport-container coordination",
                         "Synthetic demonstration data", "contoso-demo/knowledge/knowledge-returnables.md",
                         frozenset({
                             "Initial problem", "Approved intervention", "Recommended next step",
