@@ -23,7 +23,7 @@ resource provider 'Microsoft.ApiManagement/service/authorizationProviders@2024-0
   name: 'contoso-studio-v2'
   properties: {
     displayName: 'Shared Studio delegated connection'
-    identityProvider: 'oauth2'
+    identityProvider: 'oauth2pkce'
     oauth2: {
       redirectUrl: 'https://authorization-manager.consent.azure-apim.net/redirect/apim/${apim.name}'
       grantTypes: {

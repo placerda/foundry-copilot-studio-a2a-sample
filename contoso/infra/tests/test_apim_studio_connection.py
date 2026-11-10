@@ -28,9 +28,10 @@ def test_only_connection_children_are_created_under_the_existing_apim():
     assert not re.search(r"^\s*module\s", TEMPLATE.read_text(), re.MULTILINE)
 
 
-def test_generic_authorization_code_contract_does_not_invent_pkce_options():
+def test_generic_authorization_code_uses_the_documented_pkce_provider():
     text = TEMPLATE.read_text()
-    assert "identityProvider: 'oauth2'" in text
+    assert "identityProvider: 'oauth2pkce'" in text
+    assert "identityProvider: 'oauth2'" not in text
     assert "authorizationType: 'OAuth2'" in text
     assert "oauth2grantType: 'AuthorizationCode'" in text
     assert "authorizationCode: {" in text

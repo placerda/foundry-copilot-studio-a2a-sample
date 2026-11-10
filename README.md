@@ -59,22 +59,22 @@ an isolated token API candidate, not deployed infrastructure. Eight static
 boundary checks and Bicep compilation pass; they do not prove APIM policy
 runtime behavior or Studio token compatibility. The candidate binds the
 Router app/object and role, a fixed managed connection, bounded input and
-zero-body diagnostics. Read-only inventory found no credential providers;
-the existing public OAuth client lacks the APIM web callback and confidential
-credential. Supported generic PKCE setup, actual token-shape verification,
+zero-body diagnostics. Initial read-only inventory found no credential providers
+and a public OAuth client without the APIM web callback or confidential
+credential. Actual token-shape verification,
 fresh owner consent and refresh acceptance remain necessary. The current
 working broker is unchanged.
 `contoso/infra/apim-studio-connection.bicep` prepares the documented generic
-OAuth2 provider, the fixed pending authorization and connection access for
-the existing APIM managed identity only. It is not deployed or connected to
-the Router. Supply its required secure client-secret parameter through an
+OAuth2-with-PKCE provider, the fixed pending authorization and connection access
+for the existing APIM managed identity only. The Router remains separate.
+Supply its required secure client-secret parameter through an
 ARM Key Vault reference, not a literal file or command-line argument.
 If no approved vault exists, `contoso/infra/apim-studio-vault.bicep` prepares
 a dedicated Standard RBAC vault with soft delete, purge protection and ARM
 template access. Its Secrets Officer grant is scoped only to that vault and
 the explicitly selected operator. Creating the vault and granting access
 require approval, validation and what-if before deployment. This foundation
-is source-only and does not create an OAuth credential or authorized connection.
+does not create an OAuth credential or authorized connection.
 `contoso/infra/apim-studio-secret.bicep` separately prepares storage of an
 authorized credential in an existing vault through ARM. Supply the required
 secure value only in memory through the ARM deployment API, never a literal
@@ -94,21 +94,29 @@ and verify S256 PKCE before the intended owner signs in. Provisioning does not
 perform consent, mark the connection authorized or establish token shape.
 Owner, tenant, audience, scope, expiry, refresh and actual Studio acceptance
 must pass before deploying the token facade or switching the Router.
-Authoritative REST documents the generic provider as `"identityProvider": "oauth2"`
-with confidential-client credentials for the authorization-code grant and explicit authorization,
-token and refresh URLs. Microsoft documents PKCE support, but the public schema
-does not identify the portal's separate PKCE selection or a PKCE flag; do not
-invent one or deploy guessed settings. Live Graph confirms the exact
+Microsoft's [provider reference](https://github.com/Azure/APIManagement-Authorizations/blob/main/docs/identityproviders.md)
+identifies Generic OAuth 2 with PKCE as `"identityProvider": "oauth2pkce"`.
+The non-PKCE `"oauth2"` provider is not interchangeable: a real server-issued
+authorization redirect from that provider omitted both `code_challenge` and
+`code_challenge_method`. The template selects `oauth2pkce` with confidential
+credentials and explicit authorization, token and refresh URLs. Do not invent
+PKCE flags, append a static challenge or supply a verifier outside the provider.
+Source checks do not replace observing S256 in the actual generated redirect.
+Live Graph confirms the exact
 `https://api.powerplatform.com/copilotstudio-a2a` resource exposes enabled
 delegated `MCS.InvokeAsA2A` (User consent type). A fresh server-issued connection
 login link, not a constructed consent URL, must ultimately be authorized by
 the fixed owner. No missing administrator role was demonstrated.
-The final read-only platform check returned provider inventory 200/count 0
-and operations metadata 200; no provider catalog/PKCE discovery action was
-advertised. Absence of a flag is not evidence that an extra selector is needed.
-APIM owns login-link/consent handling, but automatic S256 behavior cannot be
-proved from an empty service or a free-form schema. This metadata investigation
-is closed without deployment; actual authorization/refresh remains unverified.
+APIM owns the challenge/verifier and login-link/consent handling. Verify the
+generated request's client, tenant, callback and scopes as well as S256 before
+consent. A deployed connection with `Unauthenticated` is not an authorized
+connection. Actual owner authorization, token compatibility and refresh remain
+separate runtime acceptance gates.
+Select the PKCE provider at creation. A live in-place change from `oauth2` to
+`oauth2pkce` returned a successful ARM deployment but retained `oauth2` on readback.
+Do not treat deployment success as proof of that change or proceed to consent.
+Recreating an existing candidate requires explicit deletion approval, or a new
+provider name and matching token-policy binding must be prepared and validated.
 
 ### SDK S2S credential attempt â€” November 9, 2026
 
