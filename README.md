@@ -69,8 +69,8 @@ paths from CLI arguments. Blob job metadata uses the executor's same explicit
 system identity. Local checks do not establish an available replacement host,
 successful private publication or permission to retire the Function.
 
-`contoso/infra/apim-studio-proof.bicep` is a separate, undeployed connection
-diagnostic candidate. It adds only an HTTPS API, its policy and one fixed
+`contoso/infra/apim-studio-proof.bicep` defines a separate connection
+diagnostic. It adds only an HTTPS API, its policy and one fixed
 zero-body POST operation at `/api/ops/studio-connection/`. Existing operator
 client, principal and `CONTOSO.Deploy` admission must pass before APIM accesses
 the fixed PKCE connection through its own managed identity. The policy validates
@@ -87,15 +87,17 @@ to the three isolated children. Actual negative admission checks and positive
 signature-verified proof remain required before any broker cutover.
 
 `contoso/infra/apim-token.bicep` and `contoso/infra/apim/token-policy.xml` are
-an isolated token API candidate, not deployed infrastructure. Eight static
-boundary checks and Bicep compilation pass; they do not prove APIM policy
-runtime behavior or Studio token compatibility. The candidate binds the
-Router app/object and role, a fixed managed connection, bounded input and
-zero-body diagnostics. Initial read-only inventory found no credential providers
-and a public OAuth client without the APIM web callback or confidential
-credential. Actual token-shape verification,
-fresh owner consent and refresh acceptance remain necessary. The current
-working broker is unchanged.
+an isolated token API candidate, not deployed infrastructure. The authorized
+demo diagnostic returned HTTP 200 on 2026-11-10 after signature, tenant, owner,
+client, scope and expiry verification. Its actual v2 token audience was
+`6f46e6ed-07bf-4616-80f0-47546850f654`, not the generic Power Platform resource.
+The candidate pins that exact audience and projects the verified JWT audience.
+Harness catalog and connection metadata use the same resource ID, while the
+separate Standard SDK audience is unchanged. Expiry conversion uses the same
+documented JWT property as the executed diagnostic, without `ToUniversalTime`.
+The candidate still requires its own deployment and runtime acceptance.
+The working broker and Router remain unchanged. Refresh and an actual Studio
+business invocation remain unproven, and no additional identity mode is enabled.
 `contoso/infra/apim-studio-connection.bicep` prepares the documented generic
 OAuth2-with-PKCE provider, the fixed pending authorization and connection access
 for the existing APIM managed identity only. The Router remains separate.

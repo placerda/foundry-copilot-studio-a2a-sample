@@ -82,7 +82,11 @@ def test_body_is_bounded_before_read_and_media_type_is_exact():
 
 def test_expiry_uses_documented_jwt_property_not_claim_dictionary():
     text = POLICY.read_text()
-    assert "jwt.ExpirationTime.Value.ToUniversalTime()" in text
+    assert "var expiry = (long)(jwt.ExpirationTime.Value" in text
+    assert "ToUniversalTime" not in text
+    assert "!jwt.ExpirationTime.HasValue" in text
+    assert "DateTime.UtcNow.AddSeconds(30)" in text
+    assert "DateTime.UtcNow.AddHours(48)" in text
     assert 'GetValueOrDefault("exp"' not in text
 
 
@@ -95,8 +99,13 @@ def test_shared_token_is_verified_for_tenant_owner_scope_audience_before_release
     assert claims["oid"] == ["__SHARED_OWNER__"]
     assert claims["scp"] == ["MCS.InvokeAsA2A"]
     assert claims["tid"] == ["__TENANT__"]
-    assert jwt.find("./audiences/audience").text == "https://api.powerplatform.com"
+    assert [node.text for node in jwt.findall("./audiences/audience")] == [
+        "6f46e6ed-07bf-4616-80f0-47546850f654",
+    ]
     text = POLICY.read_text()
+    assert "jwt.Audiences.Count() != 1" in text
+    assert "audience = jwt.Audiences.Single()" in text
+    assert 'audience = "https://api.powerplatform.com"' not in text
     for field in ("token =", "tenant_id =", "audience =", "scopes =", "expires_at ="):
         assert field in text
     assert "refresh_token" not in text

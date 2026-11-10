@@ -95,6 +95,27 @@ def test_success_preserves_broker_contract_and_emits_only_stage_metadata(broker,
     assert_safe(caplog)
 
 
+@pytest.mark.parametrize("audience", [
+    "6f46e6ed-07bf-4616-80f0-47546850f654", "https://api.powerplatform.com",
+])
+def test_configured_harness_accepts_only_proven_resource_metadata(broker, router_settings, audience):
+    configured = router_settings.catalog().lookup(
+        "approved-service", "supplier-delivery-terms", variant="copilot-harness",
+    ).entry
+    data = {
+        "token": GUEST_TOKEN, "tenant_id": configured.auth.tenant_id,
+        "audience": audience, "scopes": list(configured.auth.scopes),
+        "expires_at": 9999999999,
+    }
+    broker.session.post.return_value = StubResponse(json.dumps(data).encode())
+    if audience == "https://api.powerplatform.com":
+        with pytest.raises(CatalogError):
+            asyncio.run(broker.tokens(configured))
+    else:
+        result = asyncio.run(broker.tokens(configured))
+        assert result.audience == audience and result.token == GUEST_TOKEN
+
+
 @pytest.mark.parametrize("stage,error", [
     ("service_credential", AzureError(PRIVATE)),
     ("broker_http", requests.ConnectTimeout(PRIVATE)),

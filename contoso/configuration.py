@@ -16,6 +16,9 @@ from contoso.router.runtime import DemoQuestionRouter
 from contoso.providers import standard_catalog_endpoint
 
 
+HARNESS_AUDIENCE = "6f46e6ed-07bf-4616-80f0-47546850f654"
+
+
 def required(env: Mapping[str, str], name: str) -> str:
     value = env.get(name)
     if (not isinstance(value, str) or not value.strip() or len(value) > 16384
@@ -96,7 +99,7 @@ class HarnessRouterSettings:
             "studio-copilot-harness", Capability.SUPPLIER_DELIVERY_TERMS,
             STUDIOVariant.COPILOT_HARNESS, self.harness_endpoint, Protocol.A2A,
             AuthMetadata(
-                AuthScheme.ENTRA_BEARER, self.tenant_id, "https://api.powerplatform.com",
+                AuthScheme.ENTRA_BEARER, self.tenant_id, HARNESS_AUDIENCE,
                 frozenset({"https://api.powerplatform.com/copilotstudio-a2a/MCS.InvokeAsA2A"}),
             ),
             (SourceMetadata(
@@ -167,7 +170,7 @@ class RouterSettings:
                 sources=(
                     SourceMetadata(
                         "CONTOSO-DEMO-KNOWLEDGE-001", "knowledge-demo", "1",
-                        "Supplier–buyer reusable transport-container coordination",
+                        "Returnable packaging adoption in neighborhood stores",
                         "Synthetic demonstration data", "contoso-demo/knowledge/knowledge-returnables.md",
                         frozenset({
                             "Initial problem", "Approved intervention", "Recommended next step",
@@ -177,18 +180,18 @@ class RouterSettings:
                 ),
             ),
         ]
-        for variant, target, scope in (
+        for variant, target, scope, audience in (
             (STUDIOVariant.STANDARD, self.standard_endpoint,
-             "https://api.powerplatform.com/CopilotStudio.Copilots.Invoke"),
+             "https://api.powerplatform.com/CopilotStudio.Copilots.Invoke", power_platform),
             (STUDIOVariant.COPILOT_HARNESS, self.harness_endpoint,
-             "https://api.powerplatform.com/copilotstudio-a2a/MCS.InvokeAsA2A"),
+             "https://api.powerplatform.com/copilotstudio-a2a/MCS.InvokeAsA2A", HARNESS_AUDIENCE),
         ):
             provider = f"studio-{variant.value}"
             entries.append(CatalogEntry(
                 provider, Capability.SUPPLIER_DELIVERY_TERMS, variant, target,
                 Protocol.SDK_D2E if variant == STUDIOVariant.STANDARD else Protocol.A2A,
                 AuthMetadata(
-                    AuthScheme.ENTRA_BEARER, self.tenant_id, power_platform, frozenset({scope}),
+                    AuthScheme.ENTRA_BEARER, self.tenant_id, audience, frozenset({scope}),
                 ),
                 (SourceMetadata(
                     "CONTOSO-DEMO-SUPPLIER-001", provider, "1",

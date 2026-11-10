@@ -158,6 +158,21 @@ def test_connections_phase_has_no_business_invoke_and_preserves_ops():
         create_app({**environment(), "CONTOSO_GATEWAY_PHASE": "business"})
 
 
+def test_connections_phase_separates_harness_and_standard_resource_audiences():
+    captured = {}
+
+    def broker(store, connections, *args, **kwargs):
+        captured.update(connections)
+        return object()
+
+    create_connections_app(
+        environment(), authenticator=EntraAuthenticator(IdentitySettings(TENANT, AUDIENCE)),
+        store_factory=lambda **kwargs: object(), broker_factory=broker,
+    )
+    assert captured["studio-copilot-harness"].audience == "6f46e6ed-07bf-4616-80f0-47546850f654"
+    assert captured["studio-standard"].audience == "https://api.powerplatform.com"
+
+
 @pytest.mark.parametrize("transport", [None, "http-passthrough"])
 def test_connections_composition_uses_only_trusted_transport_setting(monkeypatch, transport):
     from contoso import gateway_bootstrap

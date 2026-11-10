@@ -11,7 +11,7 @@ from azure.core.exceptions import AzureError
 from azure.identity import ManagedIdentityCredential
 
 from contoso_backend.errors import ChatFailure
-from contoso.configuration import identifier, required
+from contoso.configuration import HARNESS_AUDIENCE, identifier, required
 from contoso.identity import EntraAuthenticator, IdentitySettings
 from contoso.gateway_probe import SERVICES, probe_service
 from contoso.publication import PublicationFailure
@@ -254,7 +254,9 @@ def create_connections_app(env, *, authenticator=None, store_factory=None, broke
         connections[provider_id] = ProviderConnection(
             provider_id, settings.tenant_id, identifier(values, "CONTOSO_OAUTH_CLIENT_ID"),
             identifier(values, "CONTOSO_OAUTH_GUEST_OID"), required(values, "CONTOSO_OAUTH_REDIRECT_URI"),
-            variant, "https://api.powerplatform.com", frozenset({scope}),
+            variant,
+            HARNESS_AUDIENCE if variant == STUDIOVariant.COPILOT_HARNESS else "https://api.powerplatform.com",
+            frozenset({scope}),
         )
     store = (store_factory or create_managed_identity_store)(
         container_url=required(values, "CONTOSO_OAUTH_CONTAINER_URL"),

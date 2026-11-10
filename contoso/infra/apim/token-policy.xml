@@ -44,7 +44,7 @@
     <set-variable name="studioToken" value="@(((Authorization)context.Variables[&quot;studioConnection&quot;]).AccessToken)" />
     <validate-jwt token-value="@((string)context.Variables[&quot;studioToken&quot;])" require-expiration-time="true" require-signed-tokens="true" failed-validation-httpcode="502" failed-validation-error-message="Studio connection unavailable" output-token-variable-name="studioJwt">
       <openid-config url="https://login.microsoftonline.com/__TENANT__/v2.0/.well-known/openid-configuration" />
-      <audiences><audience>https://api.powerplatform.com</audience></audiences>
+      <audiences><audience>6f46e6ed-07bf-4616-80f0-47546850f654</audience></audiences>
       <issuers><issuer>https://login.microsoftonline.com/__TENANT__/v2.0</issuer></issuers>
       <required-claims>
         <claim name="ver" match="all"><value>2.0</value></claim>
@@ -53,6 +53,21 @@
         <claim name="scp" match="any" separator=" "><value>MCS.InvokeAsA2A</value></claim>
       </required-claims>
     </validate-jwt>
+    <choose>
+      <when condition='@{
+        var jwt = (Jwt)context.Variables["studioJwt"];
+        return jwt.Audiences.Count() != 1 || !jwt.ExpirationTime.HasValue
+          || jwt.ExpirationTime.Value &lt;= DateTime.UtcNow.AddSeconds(30)
+          || jwt.ExpirationTime.Value &gt; DateTime.UtcNow.AddHours(48);
+      }'>
+        <return-response>
+          <set-status code="502" reason="Studio connection unavailable" />
+          <set-header name="Content-Type" exists-action="override"><value>application/json</value></set-header>
+          <set-header name="Cache-Control" exists-action="override"><value>no-store</value></set-header>
+          <set-body>{"error":{"code":"connection_unavailable","message":"Studio connection unavailable."}}</set-body>
+        </return-response>
+      </when>
+    </choose>
     <return-response>
       <set-status code="200" reason="OK" />
       <set-header name="Content-Type" exists-action="override"><value>application/json</value></set-header>
@@ -61,11 +76,11 @@
       <set-header name="X-Content-Type-Options" exists-action="override"><value>nosniff</value></set-header>
       <set-body>@{
         var jwt = (Jwt)context.Variables["studioJwt"];
-        var expiry = (long)(jwt.ExpirationTime.Value.ToUniversalTime()
+        var expiry = (long)(jwt.ExpirationTime.Value
           - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalSeconds;
         return JsonConvert.SerializeObject(new {
           token = (string)context.Variables["studioToken"],
-          tenant_id = "__TENANT__", audience = "https://api.powerplatform.com",
+          tenant_id = "__TENANT__", audience = jwt.Audiences.Single(),
           scopes = new [] { "https://api.powerplatform.com/copilotstudio-a2a/MCS.InvokeAsA2A" },
           expires_at = expiry
         });

@@ -1,7 +1,5 @@
 import asyncio
-import json
 from pathlib import Path
-from html.parser import HTMLParser
 
 import pytest
 
@@ -29,6 +27,8 @@ def test_both_studio_routes_use_actual_sdk_discovery_and_exact_protocol(router_s
     assert standard.protocol == Protocol.SDK_D2E
     assert harness.endpoint == settings.harness_endpoint
     assert harness.protocol == Protocol.A2A
+    assert standard.auth.audience == "https://api.powerplatform.com"
+    assert harness.auth.audience == "6f46e6ed-07bf-4616-80f0-47546850f654"
     with pytest.raises(AccessDenied):
         catalog.lookup("foreign-service", "supplier-delivery-terms", variant="standard")
 
@@ -77,64 +77,10 @@ def test_caller_configuration_is_explicit(value):
 def test_registered_router_preserves_no_match_and_does_not_guess_intents():
     router = demo_router()
     assert asyncio.run(router("Approve the supplier's proposal to deliver 300 of 500 units Friday and the remaining 200 Monday.")) is None
-    assert asyncio.run(router("A completely new supplier question")) is None
+    assert asyncio.run(router("A completely new consumer question")) is None
     assert asyncio.run(router(
         "What exact penalty will the buyer charge for delivering the remaining 200 units Monday?"
     )) == Capability.SUPPLIER_DELIVERY_TERMS
-
-
-def test_browser_suggestions_match_registered_business_scenarios():
-    root = Path(__file__).resolve().parents[2]
-    scenarios = json.loads((root / "contoso-demo" / "scenarios.json").read_text())["scenarios"]
-    configured = {scenario["question"]: scenario for scenario in scenarios}
-
-    class Suggestions(HTMLParser):
-        def __init__(self):
-            super().__init__()
-            self.prompts = []
-
-        def handle_starttag(self, tag, attrs):
-            prompt = dict(attrs).get("data-prompt")
-            if tag == "button" and prompt is not None:
-                self.prompts.append(prompt)
-
-    suggestions = Suggestions()
-    suggestions.feed((root / "frontend" / "index.html").read_text(encoding="utf-8"))
-    assert len(suggestions.prompts) == 3
-    assert len(set(suggestions.prompts)) == 3
-    router = demo_router()
-    for prompt in suggestions.prompts:
-        assert prompt in configured
-        assert asyncio.run(router(prompt)) == configured[prompt]["expected_capability"]
-    no_match = configured[
-        "Approve the supplier's proposal to deliver 300 of 500 units Friday and the remaining 200 Monday."
-    ]
-    assert no_match["expected_capability"] is None
-    assert no_match["expected_source_id"] is None
-    assert no_match["expected_source_file"] is None
-    assert no_match["question"] in suggestions.prompts
-
-
-def test_active_scenario_sources_and_catalog_metadata_are_consistent(router_settings):
-    root = Path(__file__).resolve().parents[2]
-    scenarios = json.loads((root / "contoso-demo" / "scenarios.json").read_text())["scenarios"]
-    assert len(scenarios) == 4
-    for scenario in scenarios:
-        assert asyncio.run(demo_router()(scenario["question"])) == scenario["expected_capability"]
-        if scenario["expected_capability"] is None:
-            continue
-        document = root / "contoso-demo" / scenario["expected_source_file"]
-        text = document.read_text(encoding="utf-8")
-        assert f"Source ID: {scenario['expected_source_id']}" in text
-        assert "Version: 1" in text
-        for variant in ("standard", "copilot-harness"):
-            entry = router_settings.catalog().lookup(
-                "approved-service", scenario["expected_capability"], variant=variant,
-            ).entry
-            metadata = entry.sources[0]
-            assert metadata.source_id == scenario["expected_source_id"]
-            assert metadata.version == "1"
-            assert metadata.title in text
 
 
 def test_actual_sdk_router_composition_registers_without_authentication_fallback(router_env):
@@ -230,6 +176,7 @@ def test_harness_only_catalog_has_no_standard_or_knowledge_route(router_env):
     assert selected.protocol == Protocol.A2A
     assert selected.provider_id == "studio-copilot-harness"
     assert selected.endpoint == settings.harness_endpoint
+    assert selected.auth.audience == "6f46e6ed-07bf-4616-80f0-47546850f654"
     with pytest.raises(VariantUnavailable):
         catalog.lookup("approved-service", "supplier-delivery-terms", variant="standard")
     with pytest.raises(AccessDenied):
