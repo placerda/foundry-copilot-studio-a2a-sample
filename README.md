@@ -1,4 +1,4 @@
-# Supplierâ€“Buyer Agent Collaboration
+# Supplier–Buyer Agent Collaboration
 
 A reference implementation that connects a private **Microsoft Foundry Hosted agent** to a published **Copilot Studio agent** through authenticated Agent-to-Agent (A2A) communication.
 
@@ -36,7 +36,7 @@ loopback backend now serves static frontend/capabilities with 200 and rejects
 anonymous chat with 401 and an invalid Origin with 403. Authenticated browser
 acceptance still requires the admitted guest's normal Microsoft login.
 
-**Target request path:** browser â†’ loopback Python `/api/chat` â†’ authenticated APIM â†’ private Foundry Hosted agent â†’ Copilot Studio A2A endpoint. Responses return through the same chain. No AWS runtime, Lambda emulation, SAM, model or AWS credential lookup is required for the local client.
+**Target request path:** browser → loopback Python `/api/chat` → authenticated APIM → private Foundry Hosted agent → Copilot Studio A2A endpoint. Responses return through the same chain. No AWS runtime, Lambda emulation, SAM, model or AWS credential lookup is required for the local client.
 
 The browser and real Python HTTP backend share `http://localhost:8000/`. The backend is a requester, not a locally hosted reasoning agent. The chat keeps the conversation prominent. Expand **Delivery proposal** for the synthetic context. **How the agents collaborate** distinguishes loopback HTTP/JSON from A2A 1.0/HTTPS cloud hops. The identity selector shows three choices, with shared delegated selected initially. The backend's `/api/capabilities` keeps automatic initiating-user delegation and SDK S2S disabled with explicit reasons. These adapters and their integrity-protected caller contract are not proven/deployed. Unknown/unavailable selections are rejected without fallback; mode changes clear the conversation. Verified application tenant/object identity is displayed separately from the fixed Studio connection owner, whose live identity is not falsely declared verified.
 
@@ -179,7 +179,12 @@ additive PKCE candidate. This avoids deleting or modifying an existing
 and any cleanup requires approval. Creating the parallel connection does not
 deploy the token API, change the working Router or establish owner consent.
 
-### SDK S2S credential attempt â€” November 9, 2026
+The reusable sample names its fixed authorization `shared-owner` in the
+connection template and both APIM policies. This is a new-deployment reference,
+not an instruction to rename an existing connection. Keep the template, policies,
+approved owner and consent aligned when adapting the sample.
+
+### SDK S2S credential attempt — November 9, 2026
 
 Live metadata confirms the existing SDK workload is an enabled Foundry
 `agentIdentity` / `ServiceIdentity` with the actual application permission
@@ -242,7 +247,7 @@ The diagram uses unmodified official Microsoft Azure and Power Platform product 
 
 The detailed view uses the same four stage numbers. It separates public HTTPS, private VNet traffic, identity exchange, and optional operator connectivity, including subnet boundaries, Private Link, private DNS, storage, container registry, and monitoring.
 
-[Connectivity guide](docs/connectivity.md) Â· [Setup guide](docs/setup.md) Â· [Overview PNG](docs/architecture-overview.png) Â· [Detailed PNG](docs/architecture.png)
+[Connectivity guide](docs/connectivity.md) · [Setup guide](docs/setup.md) · [Overview PNG](docs/architecture-overview.png) · [Detailed PNG](docs/architecture.png)
 
 Editable sources: [overview](docs/architecture-overview.excalidraw) and [detailed architecture](docs/architecture.excalidraw). Product icons follow [Microsoft's permitted architecture-icon usage](docs/icons/README.md).
 
@@ -338,8 +343,8 @@ npm run build
 
 ## Scope
 
-The demonstrated business route is Foundry â†’ Copilot Studio A2A using delegated `MCS.InvokeAsA2A` authorization. Registered questions are matched explicitly, not through unrestricted autonomous planning. Contoso is a fictional scenario, not a platform dependency.
+The demonstrated business route is Foundry → Copilot Studio A2A using delegated `MCS.InvokeAsA2A` authorization. Registered questions are matched explicitly, not through unrestricted autonomous planning. Contoso is a fictional scenario, not a platform dependency.
 
 Additional knowledge and SDK adapters are retained as reference code, not claimed as accepted business routes. Teams, Microsoft 365 channels, Power Automate, and bidirectional A2A are not part of this sample. Preview APIs, regional availability, token consent, and upstream response-time limits require deployment-specific review.
 
-To regenerate both editable diagrams and PNGs, run `node tools\render-diagrams.mjs --png` after installing dependencies and Playwright Chromium. The generator preserves numbered stages **1â€“4**, official icons, and rejects connector crossings. Diagram regeneration does not change VPN, DNS, or cloud resources.
+To regenerate both editable diagrams and PNGs, run `node tools\render-diagrams.mjs --png` after installing dependencies and Playwright Chromium. The generator preserves numbered stages **1–4**, official icons, and rejects connector crossings. Diagram regeneration does not change VPN, DNS, or cloud resources.

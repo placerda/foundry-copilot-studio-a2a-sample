@@ -72,7 +72,7 @@ def test_zero_body_no_query_or_encoded_payload_before_connection_access():
 def test_only_fixed_pkce_connection_with_apim_managed_identity_is_used():
     connection = POLICY.find("inbound/get-authorization-context")
     assert connection.attrib == {
-        "provider-id": "contoso-studio-v2-pkce", "authorization-id": "shared-paulo",
+        "provider-id": "contoso-studio-v2-pkce", "authorization-id": "shared-owner",
         "context-variable-name": "studioConnection", "identity-type": "managed", "ignore-error": "true",
     }
     empty = POLICY.findall("inbound/choose")[1].find("when")

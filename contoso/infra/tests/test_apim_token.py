@@ -39,7 +39,7 @@ def test_credential_access_uses_apim_identity_and_fixed_connection_not_browser_j
     root = ET.parse(POLICY).getroot()
     context = root.find("./inbound/get-authorization-context")
     assert context.attrib == {
-        "provider-id": "contoso-studio-v2-pkce", "authorization-id": "shared-paulo",
+        "provider-id": "contoso-studio-v2-pkce", "authorization-id": "shared-owner",
         "context-variable-name": "studioConnection", "identity-type": "managed",
         "ignore-error": "true",
     }
@@ -62,7 +62,7 @@ def test_only_canonical_provider_request_is_accepted():
         '{"provider_id":"other"}',
         '{"provider_id":"studio-copilot-harness","provider_id":"studio-copilot-harness"}',
         '{"provider_id":"studio-copilot-harness","endpoint":"https://evil.invalid"}',
-        '{"authorization_id":"shared-paulo"}',
+        '{"authorization_id":"shared-owner"}',
     ]:
         assert not re.fullmatch(pattern, body)
     text = POLICY.read_text()

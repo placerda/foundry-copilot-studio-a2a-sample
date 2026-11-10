@@ -42,7 +42,7 @@ resource provider 'Microsoft.ApiManagement/service/authorizationProviders@2024-0
 
 resource connection 'Microsoft.ApiManagement/service/authorizationProviders/authorizations@2024-05-01' = {
   parent: provider
-  name: 'shared-paulo'
+  name: 'shared-owner'
   properties: {
     authorizationType: 'OAuth2'
     oauth2grantType: 'AuthorizationCode'

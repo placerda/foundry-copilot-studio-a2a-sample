@@ -102,10 +102,10 @@
 <text x="104" y="1371" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="21" font-weight="400" fill="#000000"><tspan x="104" dy="0">Requests an approved provider token</tspan><tspan x="104" dy="28.35">Returns to the numbered A2A route</tspan></text>
 <rect x="800" y="1265" width="500" height="165" rx="12" fill="#ffffff" stroke="#b7c9df" stroke-width="2"/>
 <text x="824" y="1314" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="24" font-weight="600" fill="#000000"><tspan x="824" dy="0">APIM token API (target)</tspan></text>
-<text x="824" y="1371" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="21" font-weight="400" fill="#000000"><tspan x="824" dy="0">Router identity only, never local client</tspan><tspan x="824" dy="28.35">Credential Manager PKCE proof pending</tspan></text>
+<text x="824" y="1371" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="21" font-weight="400" fill="#000000"><tspan x="824" dy="0">Router identity only, never local client</tspan><tspan x="824" dy="28.35">Router facade acceptance pending</tspan></text>
 <rect x="1520" y="1265" width="500" height="165" rx="12" fill="#ffffff" stroke="#b7c9df" stroke-width="2"/>
 <text x="1544" y="1314" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="24" font-weight="600" fill="#000000"><tspan x="1544" dy="0">Microsoft Entra ID</tspan></text>
-<text x="1544" y="1371" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="21" font-weight="400" fill="#000000"><tspan x="1544" dy="0">Fixed Paulo connection + fresh consent</tspan><tspan x="1544" dy="28.35">Delegated MCS.InvokeAsA2A</tspan></text>
+<text x="1544" y="1371" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="21" font-weight="400" fill="#000000"><tspan x="1544" dy="0">Fixed shared owner + fresh consent</tspan><tspan x="1544" dy="28.35">Delegated MCS.InvokeAsA2A</tspan></text>
 <path d="M 580 1310 L 800 1310" fill="none" stroke="#8764b8" stroke-width="3" stroke-dasharray="8 7" marker-end="url(#arrow-8764b8)"/>
 <text x="615" y="1287" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="19" font-weight="400" fill="#000000"><tspan x="615" dy="0">MI / role token</tspan></text>
 <path d="M 1300 1310 L 1520 1310" fill="none" stroke="#8764b8" stroke-width="3" stroke-dasharray="8 7" marker-end="url(#arrow-8764b8)"/>

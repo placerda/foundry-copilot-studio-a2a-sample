@@ -38,7 +38,7 @@
       </when>
     </choose>
     <rate-limit-by-key calls="6" renewal-period="60" counter-key="contoso-studio-connection-proof" />
-    <get-authorization-context provider-id="contoso-studio-v2-pkce" authorization-id="shared-paulo"
+    <get-authorization-context provider-id="contoso-studio-v2-pkce" authorization-id="shared-owner"
                                context-variable-name="studioConnection" identity-type="managed" ignore-error="true" />
     <choose>
       <when condition='@(!context.Variables.ContainsKey("studioConnection")

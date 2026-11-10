@@ -6,8 +6,8 @@ import pytest
 from contoso.publication.operator_settings import publication_environment, publication_settings, publication_workspace
 
 
-APIM = "ee87630b-00f6-4ee4-ae36-599bc76ad04d"
-OLD = "35125735-5f2b-4b50-a758-2d39c94709ea"
+APIM = "11111111-1111-4111-8111-111111111111"
+OLD = "22222222-2222-4222-8222-222222222222"
 KEY = "CONTOSO_ROUTER_PLATFORM_CALLER_IDS"
 
 
