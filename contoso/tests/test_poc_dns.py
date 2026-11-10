@@ -1,7 +1,10 @@
+from argparse import Namespace
 from copy import deepcopy
 import errno
+import json
 import socket
 import struct
+from subprocess import CompletedProcess
 import xml.etree.ElementTree as ET
 
 from dnslib import DNSQuestion, DNSRecord, RCODE
@@ -28,6 +31,91 @@ def test_actual_private_records_produce_exact_public_and_private_names():
     assert result["records"] == {
         HOST: [IP], "contoso-test.privatelink.services.ai.azure.com": [IP],
     }
+
+
+def test_monitor_query_names_use_only_the_actual_private_api_address():
+    result = poc_dns.build_records(["10.76.0.0/16"], {
+        "privatelink.monitor.azure.com": [{
+            "fqdn": poc_dns.MONITOR_API + ".",
+            "aRecords": [{"ipv4Address": "10.76.2.11"}],
+        }],
+    })
+    assert set(result["records"]) == {
+        poc_dns.MONITOR_API, "api.monitor.azure.com", *poc_dns.MONITOR_QUERY_NAMES,
+    }
+    assert all(value == ["10.76.2.11"] for value in result["records"].values())
+    with pytest.raises(ValueError, match="outside"):
+        poc_dns.build_records(["10.76.0.0/16"], {
+            "privatelink.monitor.azure.com": [{
+                "fqdn": poc_dns.MONITOR_API,
+                "aRecords": [{"ipv4Address": "10.85.2.11"}],
+            }],
+        })
+
+
+@pytest.mark.parametrize("include_monitor,missing_api", [
+    (False, False), (True, False), (True, True),
+])
+def test_prepare_monitor_is_opt_in_read_only_and_requires_private_api(
+    tmp_path, monkeypatch, include_monitor, missing_api,
+):
+    source = tmp_path / "source.xml"
+    original = b"""<AzVpnProfile xmlns="http://schemas.datacontract.org/2004/07/">
+<name>Original</name><clientconfig/></AzVpnProfile>"""
+    source.write_bytes(original)
+    calls = []
+
+    def run(command, **kwargs):
+        calls.append(command)
+        if command[1:4] == ["network", "vnet", "show"]:
+            value = {"addressSpace": {"addressPrefixes": ["10.76.0.0/16"]}}
+        else:
+            assert command[1:5] == ["network", "private-dns", "record-set", "a"]
+            assert command[5] == "list"
+            zone = command[command.index("--zone-name") + 1]
+            value = []
+            if zone == "privatelink.services.ai.azure.com":
+                value = [{
+                    "fqdn": "contoso-test." + zone,
+                    "aRecords": [{"ipv4Address": IP}],
+                }]
+            elif zone == "privatelink.monitor.azure.com" and not missing_api:
+                value = [{
+                    "fqdn": poc_dns.MONITOR_API,
+                    "aRecords": [{"ipv4Address": "10.76.2.11"}],
+                }]
+        assert command[command.index("--subscription") + 1] == "selected-subscription"
+        assert command[command.index("--resource-group") + 1] == "selected-group"
+        return CompletedProcess(command, 0, stdout=json.dumps(value))
+
+    monkeypatch.setattr(poc_dns.subprocess, "run", run)
+    output = tmp_path / "export"
+    args = Namespace(
+        azure_cli="az", subscription="selected-subscription",
+        resource_group="selected-group", vnet_name="selected-vnet",
+        source_profile=source, output_dir=output, include_monitor=include_monitor,
+    )
+    if missing_api:
+        with pytest.raises(ValueError, match="private API DNS record"):
+            poc_dns.prepare(args)
+        assert not output.exists()
+    else:
+        poc_dns.prepare(args)
+        document = json.loads((output / "records.json").read_text())
+        assert (poc_dns.MONITOR_API in document["records"]) == include_monitor
+        root = ET.fromstring((output / "Contoso-VPN.azurevpnconfig.xml").read_bytes())
+        ns = {"v": "http://schemas.datacontract.org/2004/07/"}
+        names = root.findall("v:clientconfig/v:dnssuffixes/v:dnssuffix", ns)
+        assert {item.text for item in names} == {
+            "." + name for name in document["records"]
+        }
+    expected_zones = poc_dns.ZONES + (
+        poc_dns.MONITOR_ZONES if include_monitor else ()
+    )
+    assert [
+        command[command.index("--zone-name") + 1] for command in calls[1:]
+    ] == list(expected_zones)
+    assert source.read_bytes() == original
 
 
 @pytest.mark.parametrize("change", [

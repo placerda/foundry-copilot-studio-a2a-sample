@@ -237,6 +237,17 @@ The detailed view uses the same four stage numbers. It separates public HTTPS, p
 
 Editable sources: [overview](docs/architecture-overview.excalidraw) and [detailed architecture](docs/architecture.excalidraw). Product icons follow [Microsoft's permitted architecture-icon usage](docs/icons/README.md).
 
+### Operator access to private monitoring
+
+The existing `python -m contoso.ops.poc_dns prepare` utility accepts
+`--include-monitor` to read the deployed Azure Monitor private DNS zones and
+include exact query API names using the actual private API record. Without
+this option, preparation retains its original five workload zones. Use a new
+`--output-dir` to preserve the previous export. This only exports files. It
+does not import or connect a VPN, change operating-system DNS, or start a DNS
+listener. Do not interrupt another connected VPN without a specific decision.
+An exported profile is not proof of private HTTPS or telemetry access.
+
 ## What's included
 
 | Component | Location |

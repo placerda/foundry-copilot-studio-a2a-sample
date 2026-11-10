@@ -30,6 +30,19 @@ ZONES = (
     "privatelink.azurecr.io",
     "privatelink.blob.core.windows.net",
 )
+MONITOR_ZONES = (
+    "privatelink.monitor.azure.com",
+    "privatelink.oms.opinsights.azure.com",
+    "privatelink.ods.opinsights.azure.com",
+    "privatelink.agentsvc.azure-automation.net",
+)
+MONITOR_API = "api.privatelink.monitor.azure.com"
+MONITOR_QUERY_NAMES = (
+    "api.loganalytics.azure.com",
+    "api.loganalytics.io",
+    "api.applicationinsights.azure.com",
+    "api.applicationinsights.io",
+)
 LOG = logging.getLogger(__name__)
 
 
@@ -73,7 +86,7 @@ def validate_records(document):
 def build_records(networks, zone_records):
     records = {}
     for zone, entries in zone_records.items():
-        if zone not in ZONES:
+        if zone not in ZONES + MONITOR_ZONES:
             raise ValueError("Unsupported private DNS zone")
         for entry in entries:
             private_name = canonical_name(entry["fqdn"])
@@ -85,6 +98,9 @@ def build_records(networks, zone_records):
                 if name in records and records[name] != addresses:
                     raise ValueError("Conflicting private endpoint records")
                 records[name] = addresses
+    if MONITOR_API in records:
+        for name in MONITOR_QUERY_NAMES:
+            records[name] = records[MONITOR_API]
     document = {"networks": networks, "records": records}
     validate_records(document)
     return document
@@ -257,12 +273,15 @@ def prepare(args):
         return json.loads(result.stdout)
 
     vnet = azure("network", "vnet", "show", "--name", args.vnet_name)
+    zones = ZONES + (MONITOR_ZONES if args.include_monitor else ())
     zone_records = {
         zone: azure("network", "private-dns", "record-set", "a", "list",
                     "--zone-name", zone)
-        for zone in ZONES
+        for zone in zones
     }
     document = build_records(vnet["addressSpace"]["addressPrefixes"], zone_records)
+    if args.include_monitor and MONITOR_API not in document["records"]:
+        raise ValueError("Azure Monitor private API DNS record is required")
     profile = make_profile(
         args.source_profile.read_bytes(), document["records"],
     )
@@ -287,6 +306,10 @@ def main():
         export.add_argument("--" + option, required=True)
     export.add_argument("--source-profile", required=True, type=Path)
     export.add_argument("--output-dir", required=True, type=Path)
+    export.add_argument(
+        "--include-monitor", action="store_true",
+        help="Include existing private Azure Monitor zones and exact query API names",
+    )
     serve = commands.add_parser("serve")
     serve.add_argument("--records", required=True, type=Path)
     args = parser.parse_args()
