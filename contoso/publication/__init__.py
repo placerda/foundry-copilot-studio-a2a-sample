@@ -1,4 +1,4 @@
-"""Restricted private CONTOSO publication; authorization belongs to the Gateway route."""
+"""Restricted private publication through an authorized Gateway or private worker."""
 
 from .executor import (
     CommandResult, Document, ExtensionSetup, OperatorConfig, PublicationExecutor, PublicationFailure, PublicationJob,

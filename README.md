@@ -54,6 +54,21 @@ result from `studio-copilot-harness` with one source. Browser/local acceptance,
 Credential Manager migration, S2S and initiating-user delegation remain
 separate outstanding checks. No VPN or local networking changes were required.
 
+The same pinned configuration and durable Blob job store are shared with
+`python -m contoso.publication.worker`, independently of the Functions HTTP host.
+Its fixed commands are `preflight`, `sources`, `records`, `metadata`,
+`diagnostics --process-user-agent <printable-value>`, and
+`publish-service --service <approved-service> --process-user-agent <printable-value>`.
+Only the existing three service names are accepted. Invalid arguments are
+rejected before constructing an executor, and failed operations exit nonzero.
+The worker requires an explicitly authorized private Linux execution host with
+the existing system-managed-identity endpoint, pinned publication package,
+trusted environment bindings and private DNS connectivity. It does not fall back
+to the operator's Azure CLI credentials or accept targets, commands or package
+paths from CLI arguments. Blob job metadata uses the executor's same explicit
+system identity. Local checks do not establish an available replacement host,
+successful private publication or permission to retire the Function.
+
 `contoso/infra/apim-token.bicep` and `contoso/infra/apim/token-policy.xml` are
 an isolated token API candidate, not deployed infrastructure. Eight static
 boundary checks and Bicep compilation pass; they do not prove APIM policy

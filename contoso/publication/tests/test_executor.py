@@ -144,7 +144,7 @@ def config():
             "CONTOSO_ENTRA_API_CLIENT_ID": "00000000-0000-0000-0000-000000000003",
             "CONTOSO_STUDIO_ENVIRONMENT_ID": "00000000-0000-0000-0000-000000000004",
             "CONTOSO_STUDIO_STANDARD_SCHEMA": "approved_schema",
-            "CONTOSO_STUDIO_HARNESS_ENDPOINT": "https://api.powerplatform.com/copilotstudio-a2a/tenants/00000000-0000-0000-0000-000000000002/environments/00000000-0000-0000-0000-000000000004/agents/demoConsumerAgent",
+            "CONTOSO_STUDIO_HARNESS_ENDPOINT": "https://api.powerplatform.com/copilotstudio-a2a/tenants/00000000-0000-0000-0000-000000000002/environments/00000000-0000-0000-0000-000000000004/agents/cr953_contosociacopilotharness_b8kE5c",
             "CONTOSO_KNOWLEDGE_A2A_ENDPOINT": "https://sample.services.ai.azure.com/api/projects/project/agents/contoso-knowledge-agent/protocols/a2a",
             "CONTOSO_GATEWAY_URL": "https://approved.azurewebsites.net",
             "CONTOSO_SOURCE_BLOB_ENDPOINT": "https://approved.blob.core.windows.net",
@@ -655,19 +655,18 @@ def test_harness_rejects_wrong_hosts_standard_discovery_and_unsafe_paths(config,
     not os.environ.get("CONTOSO_PUBLICATION_TEST_BINDINGS") or not os.environ.get("CONTOSO_PUBLICATION_TEST_PACKAGE"),
     reason="Requires the operator's explicitly supplied nonsecret binding fixture and staged package",
 )
-def test_entire_operator_supplied_binding_fixture_with_exact_parent_constructor(config, monkeypatch):
+def test_entire_operator_supplied_binding_fixture_with_exact_parent_constructor(config):
     from contoso.gateway_bootstrap import operator_config
-    import tempfile
 
     package = Path(os.environ["CONTOSO_PUBLICATION_TEST_PACKAGE"])
     binding_path = Path(os.environ["CONTOSO_PUBLICATION_TEST_BINDINGS"])
     binding_bytes = binding_path.read_bytes()
     manifest_bytes = (package / "manifest.json").read_bytes()
     bindings = json.loads(binding_bytes)
-    monkeypatch.setattr(tempfile, "gettempdir", lambda: str(config.workspace_root))
     actual = operator_config({
         "CONTOSO_PUBLICATION_BINDINGS": json.dumps(bindings, separators=(",", ":")),
         "CONTOSO_PUBLICATION_MANIFEST_SHA256": sha(manifest_bytes),
+        "CONTOSO_PUBLICATION_WORKSPACE_ROOT": str(config.workspace_root),
     }, package=package)
     assert dict(actual.environment_values) == bindings["environment_values"]
     assert actual.identity_probe == (
@@ -686,6 +685,55 @@ def test_entire_operator_supplied_binding_fixture_with_exact_parent_constructor(
     executor(actual)._manifest()
     assert binding_path.read_bytes() == binding_bytes
     assert (package / "manifest.json").read_bytes() == manifest_bytes
+
+
+def test_shared_operator_configuration_preserves_pins_and_fixed_targets(config):
+    from contoso.publication.runtime import operator_config
+    from contoso.gateway_bootstrap import operator_config as gateway_config
+
+    assert gateway_config is operator_config
+    package = config.package_root
+    (package / "tools").mkdir()
+    (package / "tools" / "azd").write_bytes((package / config.azd_relative_path).read_bytes())
+    (package / "knowledge").mkdir()
+    for document in config.documents:
+        (package / "knowledge" / document.name).write_bytes(
+            (package / document.relative_path).read_bytes(),
+        )
+    manifest = {
+        "azure_yaml_sha256": config.azure_yaml_sha256, "azd_sha256": config.azd_sha256,
+        "extension_files": config.extension_files,
+        "documents": {document.name: document.sha256 for document in config.documents},
+    }
+    manifest_bytes = json.dumps(manifest).encode()
+    (package / "manifest.json").write_bytes(manifest_bytes)
+    bindings = {key: getattr(config, key) for key in (
+        "image", "tenant_id", "subscription_id", "resource_group", "project_id",
+        "project_endpoint", "registry_endpoint", "registry_id", "blob_endpoint", "source_storage_id",
+    )}
+    bindings["environment_values"] = dict(config.environment_values)
+    env = {
+        "CONTOSO_PUBLICATION_MANIFEST_SHA256": sha(manifest_bytes),
+        "CONTOSO_PUBLICATION_BINDINGS": json.dumps(bindings),
+        "CONTOSO_PUBLICATION_WORKSPACE_ROOT": str(config.workspace_root),
+    }
+    actual = operator_config(env, package=package)
+    assert actual.project_id == config.project_id
+    assert actual.environment_values == config.environment_values
+    assert actual.azure_yaml_sha256 == config.azure_yaml_sha256
+    assert actual.azd_sha256 == config.azd_sha256
+    assert actual.extension_files == config.extension_files
+    assert set(actual.services) == set(config.services)
+    assert actual.workspace_root == config.workspace_root
+    assert actual.environment == "contoso-demo"
+    assert actual.azd_relative_path == "tools/azd"
+    assert {document.name: document.sha256 for document in actual.documents} == manifest["documents"]
+    with pytest.raises(PublicationFailure, match="publication_manifest_changed"):
+        operator_config({**env, "CONTOSO_PUBLICATION_MANIFEST_SHA256": "0" * 64}, package=package)
+    with pytest.raises(ValueError, match="Duplicate publication field"):
+        operator_config({
+            **env, "CONTOSO_PUBLICATION_BINDINGS": '{"image":"first","image":"second"}',
+        }, package=package)
 
 
 @pytest.mark.parametrize("key,value", [
