@@ -75,6 +75,15 @@ template access. Its Secrets Officer grant is scoped only to that vault and
 the explicitly selected operator. Creating the vault and granting access
 require approval, validation and what-if before deployment. This foundation
 is source-only and does not create an OAuth credential or authorized connection.
+`contoso/infra/apim-studio-secret.bicep` separately prepares storage of an
+authorized credential in an existing vault through ARM. Supply the required
+secure value only in memory through the ARM deployment API, never a literal
+parameter file or CLI argument, and match the required Unix expiration to
+the Entra credential. Only the secret resource ID is output. This template
+does not create an Entra credential or change vault networking, roles or
+connections. Validate and preview it separately before deployment. Source
+tests and compilation do not prove a live secret write or successful retrieval
+through a connection's Key Vault parameter reference.
 The deployment tenant supplies the v2 endpoints and the exact delegated
 Studio scope plus `offline_access`. Register the generated APIM web callback
 on the confidential client without removing existing redirects. Before
