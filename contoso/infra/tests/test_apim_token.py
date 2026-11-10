@@ -114,7 +114,27 @@ def test_shared_token_is_verified_for_tenant_owner_scope_audience_before_release
 def test_missing_connection_is_explicit_and_never_uses_retained_broker_fallback():
     root = ET.parse(POLICY).getroot()
     assert root.find(".//set-status[@code='409']") is not None
-    assert root.find("./on-error/return-response/set-status").attrib["code"] == "503"
+    assert root.find("./on-error/return-response/set-status").attrib["code"].endswith(": 503)")
     assert root.find("./backend").text is None
     assert "azurewebsites.net" not in POLICY.read_text()
     assert root.findall(".//set-header[@name='Cache-Control']/value")
+
+
+def test_error_handler_preserves_authentication_token_and_throttle_statuses():
+    root = ET.parse(POLICY).getroot()
+    assert root.find("./inbound/validate-jwt").attrib["id"] == "router-jwt"
+    assert root.find("./inbound/validate-jwt[@output-token-variable-name='studioJwt']").attrib[
+        "id"
+    ] == "connection-jwt"
+    handler = root.find("./on-error/return-response")
+    status = handler.find("set-status").attrib["code"]
+    assert 'context.LastError.Reason == "OperationNotFound" ? 404' in status
+    assert 'context.LastError.PolicyId == "router-jwt" ? 401' in status
+    assert 'context.LastError.PolicyId == "connection-jwt" ? 502' in status
+    assert 'context.LastError.Reason == "RateLimitExceeded" ? 429' in status
+    assert status.endswith(": 503)")
+    assert handler.find("./set-header[@name='Cache-Control']/value").text == "no-store"
+    body = handler.find("set-body").text
+    assert '"unauthorized"' in body and '"rate_limited"' in body
+    assert "context.LastError.Message" not in body
+    assert "studioToken" not in body

@@ -87,17 +87,29 @@ to the three isolated children. Actual negative admission checks and positive
 signature-verified proof remain required before any broker cutover.
 
 `contoso/infra/apim-token.bicep` and `contoso/infra/apim/token-policy.xml` are
-an isolated token API candidate, not deployed infrastructure. The authorized
+the isolated Router-only token facade deployed in the authorized demo.
+Deployment and full policy readback passed on 2026-11-10. A policy-only
+correction added caller/downstream JWT IDs so the error handler preserves
+authentication rejection instead of masking it as a connection failure.
+Live negative checks returned five safe, non-cacheable 401 responses and a
+404 for unsupported GET, without returning credentials. Downstream 502,
+throttling 429 and successful Router token release are not proven by those
+negative checks. Existing Router grants and APIM connection access were
+verified, but directory configuration is not positive runtime proof.
+The authorized
 demo diagnostic returned HTTP 200 on 2026-11-10 after signature, tenant, owner,
 client, scope and expiry verification. Its actual v2 token audience was
 `6f46e6ed-07bf-4616-80f0-47546850f654`, not the generic Power Platform resource.
-The candidate pins that exact audience and projects the verified JWT audience.
+The facade pins that exact audience and projects the verified JWT audience.
 Harness catalog and connection metadata use the same resource ID, while the
 separate Standard SDK audience is unchanged. Expiry conversion uses the same
 documented JWT property as the executed diagnostic, without `ToUniversalTime`.
-The candidate still requires its own deployment and runtime acceptance.
-The working broker and Router remain unchanged. Refresh and an actual Studio
-business invocation remain unproven, and no additional identity mode is enabled.
+The working broker and Router remain unchanged. A business invocation through
+the replacement token facade and Router cutover remain unproven, and no
+additional identity mode is enabled. Earlier successful business receipts
+belong to the retained path, not this replacement. Usable connection-token
+continuity after the original token expired was observed without another
+owner login, but does not independently identify the OAuth refresh grant.
 `contoso/infra/apim-studio-connection.bicep` prepares the documented generic
 OAuth2-with-PKCE provider, the fixed pending authorization and connection access
 for the existing APIM managed identity only. The Router remains separate.
@@ -126,8 +138,9 @@ registration, run validation/what-if and ensure no existing connection changes.
 After deployment, obtain the authorization's actual `getLoginLinks` response
 and verify S256 PKCE before the intended owner signs in. Provisioning does not
 perform consent, mark the connection authorized or establish token shape.
-Owner, tenant, audience, scope, expiry, refresh and actual Studio acceptance
-must pass before deploying the token facade or switching the Router.
+Owner, tenant, audience, scope and expiry must be verified before exposing a
+token facade. Refresh behavior and actual Studio acceptance through that
+facade must pass before switching the Router.
 Microsoft's [provider reference](https://github.com/Azure/APIManagement-Authorizations/blob/main/docs/identityproviders.md)
 identifies Generic OAuth 2 with PKCE as `"identityProvider": "oauth2pkce"`.
 The non-PKCE `"oauth2"` provider is not interchangeable: a real server-issued

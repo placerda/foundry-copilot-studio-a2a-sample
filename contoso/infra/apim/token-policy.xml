@@ -1,6 +1,6 @@
 <policies>
   <inbound>
-    <validate-jwt header-name="Authorization" require-scheme="Bearer" require-expiration-time="true" require-signed-tokens="true" failed-validation-httpcode="401" failed-validation-error-message="Unauthorized">
+    <validate-jwt id="router-jwt" header-name="Authorization" require-scheme="Bearer" require-expiration-time="true" require-signed-tokens="true" failed-validation-httpcode="401" failed-validation-error-message="Unauthorized">
       <openid-config url="https://login.microsoftonline.com/__TENANT__/v2.0/.well-known/openid-configuration" />
       <audiences><audience>__API_AUDIENCE__</audience></audiences>
       <issuers><issuer>https://login.microsoftonline.com/__TENANT__/v2.0</issuer></issuers>
@@ -42,7 +42,7 @@
       </when>
     </choose>
     <set-variable name="studioToken" value="@(((Authorization)context.Variables[&quot;studioConnection&quot;]).AccessToken)" />
-    <validate-jwt token-value="@((string)context.Variables[&quot;studioToken&quot;])" require-expiration-time="true" require-signed-tokens="true" failed-validation-httpcode="502" failed-validation-error-message="Studio connection unavailable" output-token-variable-name="studioJwt">
+    <validate-jwt id="connection-jwt" token-value="@((string)context.Variables[&quot;studioToken&quot;])" require-expiration-time="true" require-signed-tokens="true" failed-validation-httpcode="502" failed-validation-error-message="Studio connection unavailable" output-token-variable-name="studioJwt">
       <openid-config url="https://login.microsoftonline.com/__TENANT__/v2.0/.well-known/openid-configuration" />
       <audiences><audience>6f46e6ed-07bf-4616-80f0-47546850f654</audience></audiences>
       <issuers><issuer>https://login.microsoftonline.com/__TENANT__/v2.0</issuer></issuers>
@@ -91,10 +91,18 @@
   <outbound />
   <on-error>
     <return-response>
-      <set-status code="503" reason="Connection unavailable" />
+      <set-status code='@(context.LastError.Reason == "OperationNotFound" ? 404 : context.LastError.PolicyId == "router-jwt" ? 401 : context.LastError.PolicyId == "connection-jwt" ? 502 : context.LastError.Reason == "RateLimitExceeded" ? 429 : 503)' reason="Request rejected" />
       <set-header name="Cache-Control" exists-action="override"><value>no-store</value></set-header>
       <set-header name="Content-Type" exists-action="override"><value>application/json</value></set-header>
-      <set-body>{"error":{"code":"connection_unavailable","message":"Studio connection unavailable."}}</set-body>
+      <set-body>@{
+        var code = context.LastError.Reason == "OperationNotFound" ? "not_found"
+          : context.LastError.PolicyId == "router-jwt" ? "unauthorized"
+          : context.LastError.Reason == "RateLimitExceeded" ? "rate_limited"
+          : "connection_unavailable";
+        return JsonConvert.SerializeObject(new {
+          error = new { code = code, message = "Request rejected." }
+        });
+      }</set-body>
     </return-response>
   </on-error>
 </policies>
