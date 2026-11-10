@@ -1,0 +1,134 @@
+<policies>
+  <inbound>
+    <base />
+    <validate-jwt id="operator-jwt" header-name="Authorization" require-scheme="Bearer"
+                  require-signed-tokens="true" require-expiration-time="true" clock-skew="30"
+                  failed-validation-httpcode="401" output-token-variable-name="operator">
+      <openid-config url="https://login.microsoftonline.com/__TENANT__/v2.0/.well-known/openid-configuration" />
+      <audiences><audience>__AUDIENCE__</audience></audiences>
+      <issuers><issuer>https://login.microsoftonline.com/__TENANT__/v2.0</issuer></issuers>
+    </validate-jwt>
+    <choose>
+      <when condition='@{
+        var caller = (Jwt)context.Variables["operator"];
+        return !caller.Claims.ContainsKey("azp") || caller.Claims["azp"].Length != 1
+          || caller.Claims["azp"][0] != "__OPERATOR_CLIENT__"
+          || !caller.Claims.ContainsKey("oid") || caller.Claims["oid"].Length != 1
+          || caller.Claims["oid"][0] != "__OPERATOR_PRINCIPAL__"
+          || !caller.Claims.ContainsKey("scp") || caller.Claims["scp"].Length != 1
+          || !caller.Claims["scp"][0].Split(" ".ToCharArray()).Contains("CONTOSO.Deploy");
+      }'>
+        <return-response>
+          <set-status code="403" reason="Forbidden" />
+          <set-header name="Content-Type" exists-action="override"><value>application/json</value></set-header>
+          <set-header name="Cache-Control" exists-action="override"><value>no-store</value></set-header>
+          <set-body>{"error":"forbidden"}</set-body>
+        </return-response>
+      </when>
+      <when condition='@(context.Request.Url.Query.Count != 0
+        || context.Request.Headers.GetValueOrDefault("Content-Length", "") != "0"
+        || context.Request.Headers.ContainsKey("Transfer-Encoding")
+        || context.Request.Headers.ContainsKey("Content-Encoding"))'>
+        <return-response>
+          <set-status code="400" reason="Invalid request" />
+          <set-header name="Content-Type" exists-action="override"><value>application/json</value></set-header>
+          <set-header name="Cache-Control" exists-action="override"><value>no-store</value></set-header>
+          <set-body>{"error":"invalid_request"}</set-body>
+        </return-response>
+      </when>
+    </choose>
+    <rate-limit-by-key calls="6" renewal-period="60" counter-key="contoso-studio-connection-proof" />
+    <get-authorization-context provider-id="contoso-studio-v2-pkce" authorization-id="shared-paulo"
+                               context-variable-name="studioConnection" identity-type="managed" ignore-error="true" />
+    <choose>
+      <when condition='@(!context.Variables.ContainsKey("studioConnection")
+        || context.Variables["studioConnection"] == null
+        || String.IsNullOrWhiteSpace(((Authorization)context.Variables["studioConnection"]).AccessToken))'>
+        <return-response>
+          <set-status code="409" reason="Connection unavailable" />
+          <set-header name="Content-Type" exists-action="override"><value>application/json</value></set-header>
+          <set-header name="Cache-Control" exists-action="override"><value>no-store</value></set-header>
+          <set-body>{"error":"connection_unavailable"}</set-body>
+        </return-response>
+      </when>
+    </choose>
+    <validate-jwt id="connection-jwt"
+                  token-value='@(((Authorization)context.Variables["studioConnection"]).AccessToken)'
+                  require-signed-tokens="true" require-expiration-time="true" clock-skew="0"
+                  failed-validation-httpcode="502" failed-validation-error-message="Connection token rejected"
+                  output-token-variable-name="studioJwt">
+      <openid-config url="https://login.microsoftonline.com/__TENANT__/v2.0/.well-known/openid-configuration" />
+      <audiences>
+        <audience>6f46e6ed-07bf-4616-80f0-47546850f654</audience>
+        <audience>https://api.powerplatform.com/copilotstudio-a2a</audience>
+      </audiences>
+      <issuers>
+        <issuer>https://login.microsoftonline.com/__TENANT__/v2.0</issuer>
+        <issuer>https://sts.windows.net/__TENANT__/</issuer>
+      </issuers>
+      <required-claims>
+        <claim name="ver" match="any"><value>1.0</value><value>2.0</value></claim>
+        <claim name="tid" match="all"><value>__TENANT__</value></claim>
+        <claim name="oid" match="all"><value>__SHARED_OWNER__</value></claim>
+        <claim name="scp" match="any" separator=" "><value>MCS.InvokeAsA2A</value></claim>
+      </required-claims>
+    </validate-jwt>
+    <choose>
+      <when condition='@{
+        var jwt = (Jwt)context.Variables["studioJwt"];
+        var claims = jwt.Claims;
+        if (jwt.Audiences.Count() != 1
+            || claims["ver"].Length != 1 || claims["tid"].Length != 1
+            || claims["oid"].Length != 1 || claims["scp"].Length != 1) {
+          return true;
+        }
+        var version = claims["ver"][0];
+        var clientClaim = version == "2.0" ? "azp" : "appid";
+        var issuer = version == "2.0"
+          ? "https://login.microsoftonline.com/__TENANT__/v2.0"
+          : "https://sts.windows.net/__TENANT__/";
+        return jwt.Issuer != issuer || !claims.ContainsKey(clientClaim)
+          || claims[clientClaim].Length != 1 || claims[clientClaim][0] != "__OAUTH_CLIENT__"
+          || !jwt.ExpirationTime.HasValue
+          || jwt.ExpirationTime.Value &lt;= DateTime.UtcNow.AddSeconds(30)
+          || jwt.ExpirationTime.Value &gt; DateTime.UtcNow.AddHours(48);
+      }'>
+        <return-response>
+          <set-status code="502" reason="Connection token rejected" />
+          <set-header name="Content-Type" exists-action="override"><value>application/json</value></set-header>
+          <set-header name="Cache-Control" exists-action="override"><value>no-store</value></set-header>
+          <set-body>{"error":"connection_token_rejected"}</set-body>
+        </return-response>
+      </when>
+    </choose>
+    <return-response>
+      <set-status code="200" reason="OK" />
+      <set-header name="Content-Type" exists-action="override"><value>application/json</value></set-header>
+      <set-header name="Cache-Control" exists-action="override"><value>no-store</value></set-header>
+      <set-header name="Pragma" exists-action="override"><value>no-cache</value></set-header>
+      <set-header name="X-Content-Type-Options" exists-action="override"><value>nosniff</value></set-header>
+      <set-body>@{
+        var jwt = (Jwt)context.Variables["studioJwt"];
+        return JsonConvert.SerializeObject(new {
+          status = "connection-token-proof", signature_verified = true,
+          tenant_verified = true, owner_verified = true, client_verified = true,
+          audience_verified = true, scope_verified = true,
+          audience = jwt.Audiences.Single(), token_version = jwt.Claims["ver"][0],
+          expires_at = (long)(jwt.ExpirationTime.Value
+            - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalSeconds,
+          refresh_verified = false, studio_business_verified = false
+        });
+      }</set-body>
+    </return-response>
+  </inbound>
+  <backend />
+  <outbound />
+  <on-error>
+    <return-response>
+      <set-status code='@(context.LastError.Reason == "OperationNotFound" ? 404 : context.LastError.PolicyId == "operator-jwt" ? 401 : context.LastError.PolicyId == "connection-jwt" ? 502 : context.LastError.Reason == "RateLimitExceeded" ? 429 : 503)' reason="Request rejected" />
+      <set-header name="Content-Type" exists-action="override"><value>application/json</value></set-header>
+      <set-header name="Cache-Control" exists-action="override"><value>no-store</value></set-header>
+      <set-body>@(context.LastError.Reason == "OperationNotFound" ? "{\"error\":\"not_found\"}" : context.LastError.PolicyId == "operator-jwt" ? "{\"error\":\"unauthorized\"}" : context.LastError.PolicyId == "connection-jwt" ? "{\"error\":\"connection_token_rejected\"}" : context.LastError.Reason == "RateLimitExceeded" ? "{\"error\":\"rate_limited\"}" : "{\"error\":\"connection_proof_unavailable\"}")</set-body>
+    </return-response>
+  </on-error>
+</policies>

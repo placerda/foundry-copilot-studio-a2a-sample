@@ -69,6 +69,23 @@ paths from CLI arguments. Blob job metadata uses the executor's same explicit
 system identity. Local checks do not establish an available replacement host,
 successful private publication or permission to retire the Function.
 
+`contoso/infra/apim-studio-proof.bicep` is a separate, undeployed connection
+diagnostic candidate. It adds only an HTTPS API, its policy and one fixed
+zero-body POST operation at `/api/ops/studio-connection/`. Existing operator
+client, principal and `CONTOSO.Deploy` admission must pass before APIM accesses
+the fixed PKCE connection through its own managed identity. The policy validates
+the connection token's signature, tenant, shared owner, OAuth client, delegated
+scope and expiry, allowing only the distinct Studio A2A resource URI or its
+registered application ID. It cross-checks v1/v2 token issuers and client claims,
+and returns bounded proof metadata, never an access or refresh token.
+The generic Power Platform resource is not interchangeable with that A2A
+resource. This diagnostic does not call Studio, prove refresh or change the
+token facade, Router, connection, permissions or networking. Static boundary
+tests and Bicep compilation do not validate APIM expressions at runtime.
+Deployment needs explicit approval, provider validation and a preview limited
+to the three isolated children. Actual negative admission checks and positive
+signature-verified proof remain required before any broker cutover.
+
 `contoso/infra/apim-token.bicep` and `contoso/infra/apim/token-policy.xml` are
 an isolated token API candidate, not deployed infrastructure. Eight static
 boundary checks and Bicep compilation pass; they do not prove APIM policy
