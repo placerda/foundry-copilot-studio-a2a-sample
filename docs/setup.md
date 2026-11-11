@@ -1,7 +1,8 @@
 # Setup guide
 
-For the local client, follow the Windows startup instructions
-in [README](../README.md) first. This guide's cloud deployment steps describe
+For normal use, follow [Start here](../README.md#start-here).
+Prepare a new workstation using the local setup below.
+This guide's cloud deployment steps describe
 the retained Function reference, not a completed APIM cutover. APIM networking,
 protected OAuth broker/consent, and OBO/SDK feasibility still require validation.
 Do not delete the Function or its private operator duties on the strength of
@@ -9,7 +10,81 @@ the local client or disabled identity choices.
 
 This sample preserves a working reference implementation. You must supply your own resource names, identities, permissions, consent, and publication bindings. It does not include existing cloud resources or the private deployment's operating history.
 
-## Prerequisites
+## Local application setup
+
+These steps prepare the Windows chat client. They do not deploy Azure resources.
+The gateway, agents, Entra applications and approved guest access must already
+be configured by an authorized operator.
+
+You need PowerShell 5.1 or later, Python 3.12 or later, and Node.js/npm.
+Open PowerShell in the repository root and install the local dependencies:
+
+```powershell
+python -m venv .venv-local
+.\.venv-local\Scripts\python.exe -m pip install -r contoso_backend\requirements-local.txt
+npm ci
+```
+
+Create the ignored configuration files only if they do not already exist:
+
+```powershell
+if (-not (Test-Path frontend\config.js)) {
+    Copy-Item frontend\config.example.js frontend\config.js
+}
+if (-not (Test-Path local-demo.config.json)) {
+    Copy-Item local-demo.config.example.json local-demo.config.json
+}
+```
+
+Fill in the approved **public** settings in both files:
+
+| File | What to configure |
+|---|---|
+| `frontend\config.js` | Tenant, SPA client and API scope. Keep `API_URL: "/api/chat"`, `REDIRECT_URI: "http://localhost:8000/"` and `CONTOSO_ENABLED: true` |
+| `local-demo.config.json` | Backend tenant, API audience, approved user's object ID and gateway/requester bindings from the example |
+
+The frontend tenant and API scope must match the backend tenant and audience.
+`ALLOWED_USER_OID` is the approved user's object ID **in the application tenant**,
+not their home-directory ID. Do not put passwords, client secrets or tokens in
+either file, or add credential-source overrides.
+
+The requester credential must already be provisioned in the current Windows
+user's protected store under `ContosoAgentDemo:requester:<client-id>`, matching
+the requester application. The launcher reads that exact credential without
+printing or copying it. If missing, an authorized operator must complete the
+credential setup. Do not export cloud secrets into this repository.
+
+Build the frontend and check the prerequisites:
+
+```powershell
+npm run build
+.\start-local.ps1 -CheckOnly
+```
+
+After the check succeeds, run `.\start-local.ps1` and open
+**http://localhost:8000/**. Keep the terminal open while using the chat.
+The launcher prefers `.venv-local`, then `.venv`. It does not install
+dependencies, make cloud changes or replace an existing port 8000 listener.
+
+## Local troubleshooting
+
+| Symptom | Action |
+|---|---|
+| Browser cannot connect to localhost | Start `.\start-local.ps1` and wait for its startup message |
+| Port 8000 is already in use | Use the existing application. Do not stop an unrelated process |
+| Frontend build is missing | Complete `frontend\config.js`, then run `npm run build` |
+| Public configuration is invalid | Check the example's allowed fields and tenant/audience bindings |
+| Protected credential is missing or mismatched | Have the authorized operator provision the correct Windows requester credential. There is no fallback identity |
+| Signed in, but chat says the user has no access | The signed-in user's tenant object ID must match `ALLOWED_USER_OID`, and their access token must include `access_as_user`. Verify approved bindings without broadening access |
+| Microsoft sign-in fails | Use the approved account and check the exact localhost redirect and delegated API scope |
+| A downstream request fails | Use its request ID and sanitized status for diagnosis. Do not log tokens or prompts |
+
+The local server validates the token's signature, issuer, tenant, audience,
+expiry, delegated scope and approved user before calling the gateway.
+It listens only on loopback. Do not bind this Windows launcher to a LAN
+interface or treat it as a Container Apps deployment.
+
+## Cloud prerequisites (operators)
 
 Use Python 3.12, Node.js, Azure CLI, Azure Developer CLI, Docker-compatible image tooling, and access to an Azure subscription and Entra tenant. The Hosted manifest records the required `azd` and agent-extension versions in [`contoso/azure.yaml`](../contoso/azure.yaml).
 
@@ -85,15 +160,12 @@ does not update existing identities or deployed configuration.
 
 For the browser, copy [`frontend/config.example.js`](../frontend/config.example.js) to the ignored `frontend/config.js` and fill in your own non-secret SPA settings. Set `CONTOSO_ENABLED` to `true` to show the A2A integration route. Register the exact redirect URI and delegated chat API scope. MSAL tokens stay in memory. The backend exchanges its own requester credential for a gateway token rather than forwarding the browser token across trust boundaries.
 
-```powershell
-npm ci
-npm run build
-.\start-local.ps1
-```
+Follow [Local application setup](#local-application-setup) to prepare and start
+the Windows client.
 
 ## 5. Validate the intended behavior
 
-Run the local checks in the root README first. Unit tests use synthetic identities and do not replace real service acceptance.
+Run the [development checks](#development-checks) first. Unit tests use synthetic identities and do not replace real service acceptance.
 
 For **Supplier–Buyer Agent Collaboration**, use all four registered scenarios in [`contoso-demo/scenarios.json`](../contoso-demo/scenarios.json). Evaluate the proposed 300-unit Friday / 200-unit Monday split against the buyer's 500-unit Friday request; ask for the acceptance conditions and evidence limits; ask for the unsupported exact penalty; and request approval, which must return no-match with no provider citation.
 
@@ -104,3 +176,29 @@ Only a genuinely signed-in approved guest calling actual deployed services can e
 If port 8000 is occupied during local browser tests, select an unused port without stopping another service: `$env:CONTOSO_TEST_PORT = "8019"; npm run test:ui`. The synthetic test server and browser runner use the same port.
 
 Upstream Studio calls have bounded timeouts. A historical read-timeout was observed in the original deployment, and this sample does not claim to eliminate it. Inspect safe request IDs and status codes rather than logging tokens or prompts.
+
+## Development checks
+
+These commands run tests and build the frontend. They do **not** start the
+application. For normal use, run `.\start-local.ps1`.
+
+Use Python 3.12 and Node.js:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+.\.venv\Scripts\python.exe -m pytest --import-mode=importlib contoso contoso_backend
+npm ci
+npm test
+npm run test:ui
+npm run build
+```
+
+To regenerate SVG, PNG and editable Excalidraw diagrams:
+
+```powershell
+node tools\render-diagrams.mjs --png
+```
+
+PNG rendering requires an installed Playwright Chromium browser.
+See [product icon usage](icons/README.md).

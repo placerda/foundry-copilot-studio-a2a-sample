@@ -1,7 +1,7 @@
 # Supplier–Buyer Agent Collaboration: connectivity
 
 The [README](../README.md) starts the chat application on your own computer:
-the browser and Python server share `http://localhost:8000/`. App Service is
+the browser and Python server share `http://localhost:8000/`. Azure Container Apps is
 an optional way to host that entire UI/backend in the cloud, not a prerequisite
 or another chat backend. This guide separates the APIM cloud target from
 the retained Function implementation, which remains until replacement acceptance.
@@ -17,7 +17,7 @@ The [four synthetic B2B scenarios](../contoso-demo/scenarios.json) use the `supp
 | Connection | Network / protocol | Authorization |
 |---|---|---|
 | Browser → local Python UI/backend on your computer | Loopback HTTP/JSON at `http://localhost:8000/` | Microsoft Entra sign-in and verified guest admission |
-| Optional: browser → same UI/backend hosted in App Service | Private HTTPS instead of the local loopback hop | Microsoft Entra sign-in and verified guest admission |
+| Optional: browser → same UI/backend hosted in Container Apps | Private HTTPS through the environment's internal load balancer instead of the local loopback hop | Microsoft Entra sign-in and verified guest admission |
 | Client backend → APIM | Private HTTPS, A2A 1.0 / JSON-RPC 2.0 | Fixed requester application identity and invocation-only access |
 | APIM → Foundry project / Hosted endpoint | VNet injection → Foundry private endpoint, HTTPS | APIM managed identity, scoped Foundry role and explicit Router caller admission |
 | Hosted runtime → APIM token API | Private HTTPS, separate from the business route | Exact Hosted identity and connection-use role, never the client requester |
@@ -31,18 +31,29 @@ APIC discovery is not implemented in the current request path.
 
 The default client runs the chat UI and Python requester on your own computer,
 not an AI model. Use `start-local.ps1` and open `http://localhost:8000/`.
-App Service is an optional Azure host for that same complete application.
-It replaces the local client host, not the agents or gateway. Cloud hosting
-requires adapting loopback/Host/Origin checks, credentials, Entra redirects
-and private access. The Windows launcher is not an Azure deployment script.
+Container Apps is an optional Azure host for that same complete application.
+One container image contains the chat UI and Python backend, reusing the existing
+ACR. It replaces the local application host, not the agents or gateway.
+The user's browser still runs on their own computer and opens the application's
+private HTTPS URL. Cloud hosting requires container packaging, adapting the
+loopback listener/Host/Origin checks and Windows credential access, Entra redirects
+and private connectivity. The Windows launcher is not an Azure deployment script.
 
 The APIM target with a local client uses three cloud subnets: Foundry Hosted,
 APIM Internal without delegation, and shared private endpoints. Foundry,
 Key Vault, ACR and AMPLS have four private-endpoint attachments.
-Only the optional App Service host adds a fourth subnet for outbound integration
-and a fifth private endpoint for its ingress. These are separate network
-features. Reuse corporate VPN/ExpressRoute and private DNS for private clients
-and operators. Internal APIM is not reachable through the old public-ingress
+Only the optional Container Apps host adds a fourth subnet, dedicated and
+delegated to `Microsoft.App/environments`, with a minimum size of `/27` for a
+workload profiles environment. Use an internal environment with app ingress
+accessible from the VNet, not restricted to the environment's apps.
+The environment's internal load balancer provides private HTTPS access.
+VNet integration also provides access to Internal APIM and private ACR.
+This option needs **no additional Container Apps private endpoint**:
+the total remains four private endpoints, with either hosting choice.
+Configure the environment's default-domain private DNS to resolve to its
+internal IP, and preserve required platform egress.
+Reuse corporate VPN/ExpressRoute and private DNS for private clients and
+operators. Internal APIM is not reachable through the old public-ingress
 assumption, whether the client is local or cloud-hosted.
 
 Credential Manager replaces the custom Function broker and its dedicated
@@ -52,8 +63,9 @@ remain public SaaS services. APIM cannot execute image builds or publication
 jobs, which need a separately authorized private execution environment.
 No existing Function or storage retirement is authorized by this diagram.
 
-See Microsoft's [Credential Manager overview](https://learn.microsoft.com/azure/api-management/credentials-overview)
-and [APIM Internal networking](https://learn.microsoft.com/azure/api-management/api-management-using-with-internal-vnet).
+See Microsoft's [Credential Manager overview](https://learn.microsoft.com/azure/api-management/credentials-overview),
+[APIM Internal networking](https://learn.microsoft.com/azure/api-management/api-management-using-with-internal-vnet)
+and [Container Apps networking](https://learn.microsoft.com/azure/container-apps/networking).
 Documented platform capabilities do not replace acceptance of this Studio
 connection, token facade, Router cutover or proposed client host.
 
@@ -111,5 +123,12 @@ An operator uses Entra-authenticated public HTTPS to the gateway's restricted pu
 Azure Resource Manager is a separate public HTTPS control plane. The reference image builder can schedule a persistent ACR task through ARM. The task's managed identity and explicit trusted-service bypass permit a private registry build without opening anonymous registry access. That bypass is not general public network access and is disabled in the sample foundation by default.
 
 Direct operator access to private endpoints can optionally use an Entra-authenticated point-to-site Azure VPN plus correctly scoped private DNS. This is distinct from the cloud runtime route. The original cloud route was accepted without the client VPN, while direct VPN/DNS acceptance was deferred.
+
+The [detailed diagram](architecture.svg) separates the main request path,
+private service access and operator connectivity. The separate token-exchange
+panel is omitted for readability, not removed from the authentication design.
+The editable [overview](architecture-overview.excalidraw) and
+[detailed source](architecture.excalidraw) use unmodified
+[Microsoft product icons](icons/README.md).
 
 The published source includes only synthetic scenarios and reusable code. Resource names in the drawing are logical labels, not existing deployment identifiers.
