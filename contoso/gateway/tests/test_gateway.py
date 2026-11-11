@@ -33,8 +33,8 @@ from contoso.state import EncryptedStateStore
 
 TENANT = "11111111-1111-4111-8111-111111111111"
 AUDIENCE = "99999999-9999-4999-8999-999999999999"
-AWS_CLIENT = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
-AWS_OID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+REQUESTER_CLIENT = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+REQUESTER_OID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
 AUTHORING_CLIENT = "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
 ADMIN_OID = "55555555-5555-4555-8555-555555555555"
 AGENT_CLIENT = "dddddddd-dddd-4ddd-8ddd-dddddddddddd"
@@ -145,7 +145,7 @@ class FakeNetwork:
 @pytest.fixture
 def setup(signing_key):
     settings = GatewaySettings(
-        TENANT, AUDIENCE, AWS_CLIENT, AWS_OID, AUTHORING_CLIENT, ADMIN_OID, AGENT_CLIENT, AGENT_OID,
+        TENANT, AUDIENCE, REQUESTER_CLIENT, REQUESTER_OID, AUTHORING_CLIENT, ADMIN_OID, AGENT_CLIENT, AGENT_OID,
     )
     authenticator = EntraAuthenticator(
         settings.identity_settings, cache=SimpleNamespace(get=lambda kid: signing_key.public_key()),
@@ -158,7 +158,7 @@ def setup(signing_key):
 def signed(setup, route="invoke", **changes):
     now = int(time.time())
     client, caller, permission = {
-        "invoke": (AWS_CLIENT, AWS_OID, "CONTOSO.Invoke"),
+        "invoke": (REQUESTER_CLIENT, REQUESTER_OID, "CONTOSO.Invoke"),
         "prepare": (AUTHORING_CLIENT, ADMIN_OID, "CONTOSO.Deploy"),
         "status": (AUTHORING_CLIENT, ADMIN_OID, "CONTOSO.Deploy"),
         "token": (AGENT_CLIENT, AGENT_OID, CONNECTION_USE),
@@ -690,7 +690,7 @@ def test_known_routes_are_post_only(setup, route):
 def test_cloud_settings_env_has_no_defaults_for_identities(setup):
     env = {
         "CONTOSO_TENANT_ID": TENANT, "CONTOSO_GATEWAY_AUDIENCE": AUDIENCE,
-        "CONTOSO_AWS_REQUESTER_CLIENT_ID": AWS_CLIENT, "CONTOSO_AWS_REQUESTER_OID": AWS_OID,
+        "CONTOSO_REQUESTER_CLIENT_ID": REQUESTER_CLIENT, "CONTOSO_REQUESTER_OID": REQUESTER_OID,
         "CONTOSO_AUTHORING_CLIENT_ID": AUTHORING_CLIENT, "CONTOSO_AUTHORING_ADMIN_OID": ADMIN_OID,
         "CONTOSO_MANAGED_AGENT_CLIENT_ID": AGENT_CLIENT, "CONTOSO_MANAGED_AGENT_OID": AGENT_OID,
     }
@@ -900,7 +900,7 @@ def test_each_explicit_agent_pair_can_token_vend(setup, client, oid):
 @pytest.mark.parametrize("client,oid", [
     (AGENT_CLIENT, SECOND_AGENT_OID), (SECOND_AGENT_CLIENT, AGENT_OID),
     (OTHER, AGENT_OID), (AGENT_CLIENT, OTHER),
-    (AWS_CLIENT, SECOND_AGENT_OID), (AUTHORING_CLIENT, SECOND_AGENT_OID),
+    (REQUESTER_CLIENT, SECOND_AGENT_OID), (AUTHORING_CLIENT, SECOND_AGENT_OID),
 ])
 def test_crossed_unknown_or_foreign_agent_pair_is_denied_before_broker(setup, client, oid):
     multi_identity_settings(setup)
@@ -968,8 +968,8 @@ def settings_env(setup):
     settings = setup[1]
     return {
         "CONTOSO_TENANT_ID": settings.tenant_id, "CONTOSO_GATEWAY_AUDIENCE": settings.audience,
-        "CONTOSO_AWS_REQUESTER_CLIENT_ID": settings.aws_requester_client_id,
-        "CONTOSO_AWS_REQUESTER_OID": settings.aws_requester_oid,
+        "CONTOSO_REQUESTER_CLIENT_ID": settings.requester_client_id,
+        "CONTOSO_REQUESTER_OID": settings.requester_oid,
         "CONTOSO_AUTHORING_CLIENT_ID": settings.authoring_client_id,
         "CONTOSO_AUTHORING_ADMIN_OID": settings.authoring_admin_oid,
         "CONTOSO_MANAGED_AGENT_CLIENT_ID": settings.managed_agent_client_id,

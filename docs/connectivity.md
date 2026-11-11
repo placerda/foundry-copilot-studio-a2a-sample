@@ -28,7 +28,7 @@ The [four synthetic B2B scenarios](../contoso-demo/scenarios.json) use the `supp
 
 The gateway's public listener is intentional. VNet integration supplies **outbound** private connectivity, not a private inbound listener. Managed identity provides authorization but does not replace network reachability.
 
-Copilot Studio and Entra remain public SaaS destinations reached over TLS. The sample does not claim that the complete end-to-end route is private. No AWS-to-Azure site-to-site tunnel is required.
+Copilot Studio and Entra remain public SaaS destinations reached over TLS. The sample does not claim that the complete end-to-end route is private. The external requester calls the authenticated HTTPS gateway without a site-to-site tunnel.
 
 ## Network topology
 

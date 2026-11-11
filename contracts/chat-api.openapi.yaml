@@ -1,131 +1,83 @@
 openapi: 3.1.0
 info:
-  title: Personal authenticated chat
-  version: 1.0.0
+  title: Supplier-Buyer local chat API
+  version: 2.0.0
   description: >
-    Lambda Function URL BUFFERED/NONE. Entra access-token validation and
-    owner authorization occur in the handler before graph or inference.
-    A public URL can incur Lambda costs even for rejected requests.
+    Loopback-only Python HTTP backend for the authenticated Azure gateway.
+    Entra authenticity, delegated scope and allowed user are verified before
+    parsing chat content or invoking the configured native A2A requester.
+servers:
+  - url: http://localhost:8000
 paths:
-  /:
+  /api/chat:
     post:
       operationId: sendChatMessage
-      summary: Send recent context ending with the current user message
       security:
         - entraAccessToken: []
       requestBody:
         required: true
         description: >
-          Complete UTF-8 JSON body at most 32768 bytes, after transport
-          base64 decoding. No compression. Only user/assistant roles;
-          alternate, start and end with user, hence odd list length.
-          Contents contain at most 4000 Unicode code points each;
-          isolated surrogates and whitespace-only content are invalid.
+          At most 32768 UTF-8 bytes with no compression. Messages alternate
+          user/assistant, start and end with user, and contain nonblank text.
+          Only the current user question is forwarded downstream.
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/ChatRequest'
-            example:
-              messages:
-                - role: user
-                  content: Explain LangGraph in one sentence.
       responses:
         '200':
-          description: >
-            All generated text in one buffered response; initially up to
-            400 model output tokens. Nonblank text stopped by the generation
-            limit is successful with output_limited true and must be displayed
-            with a limit notice, never automatically continued.
+          description: A validated attributed answer or explicit no-match, without automatic continuation.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ChatResponse'
-              examples:
-                normal:
-                  value:
-                    answer: LangGraph organizes conversational workflows as a graph.
-                    request_id: example-normal-request
-                    output_limited: false
-                limited:
-                  value:
-                    answer: This explanation reached the generation limit before finishing.
-                    request_id: example-limited-request
-                    output_limited: true
         '400':
-          description: Invalid JSON, encoding, media type, shape, message sequence or limits; no inference
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ChatError'
+          $ref: '#/components/responses/ChatError'
+          description: Invalid transport, JSON, message sequence or options.
         '401':
-          description: Missing or invalid bearer access token, including signature, algorithm, issuer, audience, tenant or time
-          headers:
-            WWW-Authenticate:
-              schema:
-                type: string
-                const: Bearer
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ChatError'
+          $ref: '#/components/responses/ChatError'
+          description: Missing or invalid Entra bearer access token.
         '403':
-          description: Authentic token without required delegated scope or allowed owner oid
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ChatError'
+          $ref: '#/components/responses/ChatError'
+          description: Invalid Host/Origin or authenticated caller without required admission.
+        '409':
+          $ref: '#/components/responses/ChatError'
+          description: The selected identity mode is known but not enabled.
         '429':
-          description: >
-            Bedrock throttling returns a handler error. Lambda concurrency
-            throttling before handler execution may instead return a
-            platform-native body without request_id.
-          content:
-            application/json:
-              schema:
-                oneOf:
-                  - $ref: '#/components/schemas/ChatError'
-                  - type: object
-                    additionalProperties: true
-            text/plain:
-              schema:
-                type: string
+          $ref: '#/components/responses/ChatError'
+          description: Bounded local capacity or downstream throttling, without retries.
         '500':
-          description: Sanitized internal error; platform failures may have a different body
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ChatError'
+          $ref: '#/components/responses/ChatError'
+          description: Sanitized internal error.
         '502':
-          description: Required identity keys unavailable, inference timeout/unavailability or invalid upstream response; no fail-open
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ChatError'
-      x-body-max-bytes: 32768
-      x-output-max-tokens-default: 400
-    options:
-      operationId: preflightChat
-      summary: Browser CORS preflight handled by the Function URL
+          $ref: '#/components/responses/ChatError'
+          description: Protected credential or downstream service unavailable or invalid response.
+      x-unsupported-methods:
+        options: 405
+        get: 404
+  /api/capabilities:
+    get:
+      operationId: getIdentityCapabilities
       security: []
       responses:
         '200':
-          description: Platform CORS preflight; no JWT, graph or inference
-    x-unsupported-methods:
-      status: 405
-      allow: POST, OPTIONS
-      description: Handler returns sanitized ChatError for other methods; no inference.
-  x-path-policy:
-    description: Non-root paths return a sanitized 400 unsupported_path error; no inference.
+          description: >
+            Shared delegated is the default enabled mode. Initiating-user
+            delegation and service-to-service remain disabled with reasons.
 components:
+  responses:
+    ChatError:
+      description: Rejected request or sanitized service failure.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ChatError'
   securitySchemes:
     entraAccessToken:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: >
-        RS256 v2 access token for the API, configured tenant issuer/audience,
-        required exp and valid nbf if present. Scope access_as_user and
-        allowed owner oid checked after authenticity. ID/Graph tokens rejected.
+      description: RS256 v2 token with exact tenant, API audience, access_as_user scope and allowed user OID.
   schemas:
     Message:
       type: object
@@ -139,11 +91,10 @@ components:
           type: string
           minLength: 1
           maxLength: 4000
-          description: Unicode code points; also reject whitespace-only text and isolated surrogates.
     ChatRequest:
       type: object
       additionalProperties: false
-      required: [messages]
+      required: [messages, contoso_options]
       properties:
         messages:
           type: array
@@ -151,30 +102,84 @@ components:
           maxItems: 10
           items:
             $ref: '#/components/schemas/Message'
-          description: >
-            Default server maximum 10 (configurable through MAX_MESSAGES).
-            Business validator enforces alternation, odd count and
-            first/last user; a coherent window normally has at most 9 items.
+        contoso_options:
+          type: object
+          additionalProperties: false
+          required: [integration, studio_variant]
+          properties:
+            integration:
+              const: a2a
+            studio_variant:
+              const: copilot-harness
+        identity_mode:
+          type: string
+          default: shared-delegated
+          enum: [shared-delegated, user-delegation, service-to-service]
     ChatResponse:
       type: object
       additionalProperties: false
-      required: [answer, request_id, output_limited]
+      required: [answer, request_id, output_limited, contoso, identity]
       properties:
         answer:
           type: string
           minLength: 1
-          pattern: '\S'
-          description: Usable text; whitespace-only output is a dependency error, not success.
         request_id:
           type: string
           minLength: 1
         output_limited:
           type: boolean
-          description: >
-            Required server-derived signal. True exactly when accepted
-            Converse text has stopReason max_tokens; false for accepted normal
-            completion. UI displays a notice attached to this answer when true.
-            Missing or nonboolean values invalidate success; no default fallback.
+          description: Indicates output capped to the client's history text limit.
+        contoso:
+          type: object
+          additionalProperties: false
+          required: [status, provider_id, studio_variant, sources, citations, execution_path]
+          properties:
+            status:
+              enum: [answered, insufficient-evidence, no-matching-capability]
+            provider_id:
+              type: [string, 'null']
+            studio_variant:
+              enum: [copilot-harness, 'standard', null]
+            sources:
+              type: array
+              maxItems: 32
+              items:
+                type: object
+            citations:
+              type: array
+              maxItems: 64
+              items:
+                type: object
+            execution_path:
+              type: array
+              minItems: 1
+              maxItems: 32
+              items:
+                type: string
+        identity:
+          type: object
+          additionalProperties: false
+          required: [mode, application_caller, studio_caller]
+          properties:
+            mode:
+              const: shared-delegated
+            application_caller:
+              type: object
+              required: [tenant_id, object_id]
+              properties:
+                tenant_id:
+                  type: string
+                object_id:
+                  type: string
+            studio_caller:
+              type: object
+              additionalProperties: false
+              required: [kind, verified]
+              properties:
+                kind:
+                  const: fixed-shared-user
+                verified:
+                  const: false
     ChatError:
       type: object
       additionalProperties: false
@@ -187,37 +192,16 @@ components:
           properties:
             code:
               type: string
-              enum:
-                - invalid_request
-                - unsupported_path
-                - unauthenticated
-                - forbidden
-                - method_not_allowed
-                - throttled
-                - dependency_unavailable
-                - internal_error
             message:
               type: string
               minLength: 1
-              description: User-friendly text without tokens, claims, payload, configuration or stack trace.
         request_id:
           type: string
           minLength: 1
-x-cors:
-  owner: Function URL configuration only
-  allowOrigins: ['http://localhost:8000']
-  allowMethods: [POST, OPTIONS]
-  allowHeaders: [Authorization, Content-Type]
-  allowCredentials: false
-  description: Other browser origins are not allowed; this is not an authentication control.
 x-response-headers:
-  handler:
-    Content-Type: application/json; charset=utf-8
-    Cache-Control: no-store
-  description: Handler must not emit CORS headers or sensitive diagnostic headers.
-x-error-precedence:
-  description: >
-    Method/path and bounded transport checks precede credential validation;
-    authenticity precedes scope/owner, which precede message validation.
-    Inputs with multiple faults need not receive an auth error first.
-    Every rejection precedes graph.invoke and Converse.
+  Content-Type: application/json
+  Cache-Control: no-store
+  X-Request-ID: Matches the JSON request_id for chat responses.
+x-browser-boundary: >
+  Use the exact localhost origin and normal Microsoft sign-in. No cross-origin
+  API, browser token forwarding, dynamic endpoint or fallback model is provided.

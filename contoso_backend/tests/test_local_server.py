@@ -126,12 +126,11 @@ def test_apim_exact_allowlist():
         gateway_endpoint("https://approved.azure-api.net/api/a2a", "/api/a2a")
 
 
-def test_local_settings_ignore_aws_and_redact_secret():
+def test_local_settings_redact_secret_and_do_not_host_a_model():
     env = dict(zip(("TENANT_ID", "API_AUDIENCE", "ALLOWED_USER_OID"), IDS[:3]))
     env.update(CONTOSO_GATEWAY_URL="https://synthetic.azurewebsites.net/api/a2a",
                CONTOSO_ENTRA_TENANT_ID=IDS[0], CONTOSO_GATEWAY_API_CLIENT_ID=IDS[1],
-               CONTOSO_REQUESTER_CLIENT_ID=IDS[3], CONTOSO_REQUESTER_CLIENT_SECRET="synthetic-secret",
-               AWS_REGION="invalid", BEDROCK_MODEL_ID="invalid")
+               CONTOSO_REQUESTER_CLIENT_ID=IDS[3], CONTOSO_REQUESTER_CLIENT_SECRET="synthetic-secret")
     settings = LocalSettings.from_env(env)
     assert "synthetic-secret" not in repr(settings)
     assert not hasattr(settings, "region") and not hasattr(settings, "model_id")

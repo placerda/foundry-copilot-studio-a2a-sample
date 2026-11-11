@@ -113,7 +113,7 @@ def test_unavailable_variant_does_not_call_other_provider(setup):
 
 
 @pytest.mark.parametrize("changes", [
-    {"tenant_id": "other-tenant"}, {"audience": "aws-api-audience"},
+    {"tenant_id": "other-tenant"}, {"audience": "other-api-audience"},
     {"scopes": frozenset({"wrong-scope"})}, {"expires_at": 100},
 ])
 def test_wrong_or_expired_token_is_rejected_before_transport(setup, changes):

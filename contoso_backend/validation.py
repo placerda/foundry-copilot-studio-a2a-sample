@@ -1,5 +1,3 @@
-import base64
-import binascii
 import json
 import re
 
@@ -9,21 +7,6 @@ if __package__:
 else:
     from config import MAX_BODY_BYTES, MAX_CONTENT_LENGTH
     from errors import ChatFailure, invalid
-
-
-def headers_of(event):
-    headers = event.get("headers") or {}
-    if not isinstance(headers, dict):
-        raise invalid()
-    normalized = {}
-    for name, value in headers.items():
-        if not isinstance(name, str) or not isinstance(value, str):
-            raise invalid()
-        lower = name.lower()
-        if lower in normalized:
-            raise invalid()
-        normalized[lower] = value
-    return normalized
 
 
 def unique_object(pairs):
@@ -52,38 +35,6 @@ def decode_json(raw, headers, allow_identity_mode=False):
         return payload
     except (ValueError, UnicodeError, RecursionError):
         raise invalid() from None
-
-
-def decode_transport(event):
-    headers = headers_of(event)
-    media = headers.get("content-type", "")
-    if not re.fullmatch(r"application/json(?:\s*;\s*charset=utf-8)?", media, flags=re.IGNORECASE):
-        raise invalid()
-    if "content-encoding" in headers:
-        raise invalid()
-    body = event.get("body")
-    encoded = event.get("isBase64Encoded", False)
-    if not isinstance(body, str) or type(encoded) is not bool:
-        raise invalid()
-    try:
-        if encoded:
-            if len(body) > 4 * ((MAX_BODY_BYTES + 2) // 3):
-                raise ValueError
-            raw = base64.b64decode(body, validate=True)
-        else:
-            if len(body) > MAX_BODY_BYTES:
-                raise ValueError
-            raw = body.encode("utf-8")
-        if len(raw) > MAX_BODY_BYTES:
-            raise ValueError
-        payload = json.loads(raw.decode("utf-8"), object_pairs_hook=unique_object,
-                             parse_constant=lambda value: (_ for _ in ()).throw(ValueError(value)))
-        if not isinstance(payload, dict) or set(payload) not in (
-                {"messages"}, {"messages", "contoso_options"}):
-            raise ValueError
-    except (ValueError, UnicodeError, binascii.Error, RecursionError):
-        raise invalid() from None
-    return payload
 
 
 def validate_messages(payload, settings):

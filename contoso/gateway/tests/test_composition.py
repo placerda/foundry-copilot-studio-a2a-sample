@@ -8,7 +8,7 @@ from contoso.identity import EntraAuthenticator, IdentitySettings
 from contoso.ops.configure_gateway import configure
 
 from contoso.gateway.tests.test_gateway import (
-    TENANT, AUDIENCE, AWS_CLIENT, AWS_OID, AUTHORING_CLIENT, ADMIN_OID,
+    TENANT, AUDIENCE, REQUESTER_CLIENT, REQUESTER_OID, AUTHORING_CLIENT, ADMIN_OID,
     AGENT_CLIENT, AGENT_OID, SECOND_AGENT_CLIENT, SECOND_AGENT_OID, GUEST, NATIVE_CLIENT,
 )
 
@@ -16,11 +16,11 @@ from contoso.gateway.tests.test_gateway import (
 def environment():
     return {
         "CONTOSO_ENTRA_TENANT_ID": TENANT, "CONTOSO_ENTRA_API_CLIENT_ID": AUDIENCE,
-        "CONTOSO_AWS_REQUESTER_CLIENT_ID": AWS_CLIENT, "CONTOSO_AWS_REQUESTER_OID": AWS_OID,
+        "CONTOSO_REQUESTER_CLIENT_ID": REQUESTER_CLIENT, "CONTOSO_REQUESTER_OID": REQUESTER_OID,
         "CONTOSO_AUTHORING_CLIENT_ID": AUTHORING_CLIENT, "CONTOSO_AUTHORING_ADMIN_OID": ADMIN_OID,
         "CONTOSO_MANAGED_AGENT_CLIENT_ID": AGENT_CLIENT, "CONTOSO_MANAGED_AGENT_OID": AGENT_OID,
         "CONTOSO_MANAGED_AGENT_IDENTITIES": json.dumps([{"client_id": SECOND_AGENT_CLIENT, "oid": SECOND_AGENT_OID}]),
-        "CONTOSO_GATEWAY_IDENTITY_OID": AWS_OID, "CONTOSO_PLATFORM_CALLER_IDS": json.dumps([AWS_OID]),
+        "CONTOSO_GATEWAY_IDENTITY_OID": REQUESTER_OID, "CONTOSO_PLATFORM_CALLER_IDS": json.dumps([REQUESTER_OID]),
         "CONTOSO_STUDIO_ENVIRONMENT_ID": TENANT, "CONTOSO_STUDIO_STANDARD_SCHEMA": "ApprovedSTUDIO",
         "CONTOSO_STUDIO_HARNESS_ENDPOINT": "https://api.powerplatform.com/copilotstudio-a2a/approved",
         "CONTOSO_GATEWAY_URL": "https://gateway.azurewebsites.net",
@@ -67,7 +67,7 @@ def test_business_composition_preserves_ops_and_exact_guest_broker_grants():
     assert set(args[2]) == {AGENT_OID, SECOND_AGENT_OID}
     assert kwargs["preparer_providers"] == {ADMIN_OID: frozenset(args[1])}
     assert kwargs["cache_ttl"] == 2592000
-    assert calls["network"][1]["catalog_caller_id"] == AWS_OID
+    assert calls["network"][1]["catalog_caller_id"] == REQUESTER_OID
 
 
 class FakeCloud:
@@ -96,10 +96,10 @@ class FakeCloud:
         if "/servicePrincipals(appId=" in url:
             client = url.split("appId='")[1].split("'")[0]
             return {
-                "id": AWS_OID if client == AWS_CLIENT else AUDIENCE, "appId": client,
+                "id": REQUESTER_OID if client == REQUESTER_CLIENT else AUDIENCE, "appId": client,
                 "appRoles": [
                     {"id": AGENT_OID, "value": "CONTOSO.Connection.Use", "isEnabled": True, "allowedMemberTypes": ["Application"]},
-                    {"id": AWS_OID, "value": "CONTOSO.Invoke", "isEnabled": True, "allowedMemberTypes": ["Application"]},
+                    {"id": REQUESTER_OID, "value": "CONTOSO.Invoke", "isEnabled": True, "allowedMemberTypes": ["Application"]},
                 ],
             }
         if "/servicePrincipals/" in url:
@@ -107,7 +107,7 @@ class FakeCloud:
             return {"id": oid, "appId": AGENT_CLIENT if oid == AGENT_OID else SECOND_AGENT_CLIENT}
         if "/applications(" in url:
             return {"publicClient": {"redirectUris": ["http://localhost:8766/oauth/callback"]}}
-        return {"properties": {"defaultHostName": "gateway.azurewebsites.net"}, "identity": {"principalId": AWS_OID}}
+        return {"properties": {"defaultHostName": "gateway.azurewebsites.net"}, "identity": {"principalId": REQUESTER_OID}}
 
 
 def records():
@@ -126,7 +126,7 @@ def test_cloud_configuration_preserves_secret_key_localhost_and_authenticated_ro
     cloud = FakeCloud()
     result = configure(
         cloud, subscription=TENANT, resource_group="approved", function_name="gateway",
-        oauth_client_id=NATIVE_CLIENT, guest_oid=GUEST, requester_client_id=AWS_CLIENT,
+        oauth_client_id=NATIVE_CLIENT, guest_oid=GUEST, requester_client_id=REQUESTER_CLIENT,
         records=records(), apply=True,
     )
     assert "CONTOSO_OAUTH_STATE_KEY" not in repr(result)

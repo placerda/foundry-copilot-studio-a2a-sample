@@ -124,10 +124,10 @@ def setup(tenant: str, guest: str, spa_id: str):
         graph.call("PATCH", f"servicePrincipals/{resource['id']}", body={
             "appRoleAssignmentRequired": True,
         })
-    requester = graph.find("applications", "displayName eq 'Contoso AWS Agent'")
+    requester = graph.find("applications", "displayName eq 'Contoso Local Requester'")
     if requester is None:
         requester = graph.call("POST", "applications", body={
-            "displayName": "Contoso AWS Agent", "signInAudience": "AzureADMyOrg",
+            "displayName": "Contoso Local Requester", "signInAudience": "AzureADMyOrg",
         })
     if requester["signInAudience"] != "AzureADMyOrg":
         raise RuntimeError("Existing requester must be single-tenant")

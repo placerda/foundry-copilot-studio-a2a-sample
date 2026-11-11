@@ -80,11 +80,8 @@ class Settings:
     tenant_id: str
     audience: str
     owner_oid: str
-    region: str = "us-east-2"
-    model_id: str = "amazon.nova-lite-v1:0"
     scope: str = "access_as_user"
     max_messages: int = 10
-    max_output_tokens: int = 400
     contoso: CONTOSOSettings | None = None
 
     @property
@@ -97,20 +94,15 @@ class Settings:
         try:
             ids = [str(UUID(env[name])) for name in
                    ("TENANT_ID", "API_AUDIENCE", "ALLOWED_USER_OID")]
-            region = env.get("AWS_REGION", "us-east-2")
-            model = env.get("BEDROCK_MODEL_ID", "amazon.nova-lite-v1:0")
             scope = env.get("REQUIRED_SCOPE", "access_as_user")
             count = int(env.get("MAX_MESSAGES", "10"))
-            tokens = int(env.get("MAX_OUTPUT_TOKENS", "400"))
             contoso_enabled = env.get("CONTOSO_ENABLED", "false")
             if contoso_enabled not in ("true", "false"):
                 raise ValueError
             contoso = CONTOSOSettings.from_env(env) if contoso_enabled == "true" else None
-            if (region != "us-east-2" or count < 1 or tokens < 1
-                    or not re.fullmatch(r"amazon\.nova-lite-v1:0", model)
+            if (count < 1
                     or not re.fullmatch(r"[A-Za-z0-9_.-]+", scope)):
                 raise ValueError
         except (KeyError, ValueError, TypeError, AttributeError):
             raise ValueError("Invalid service configuration") from None
-        return cls(*ids, region=region, model_id=model, scope=scope,
-                   max_messages=count, max_output_tokens=tokens, contoso=contoso)
+        return cls(*ids, scope=scope, max_messages=count, contoso=contoso)

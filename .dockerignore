@@ -2,13 +2,14 @@
 .github
 .specify
 .venv
+.venv-local
 node_modules
-.aws-sam
 .azure
 **/.azure
 **/.venv
 frontend/dist
 frontend/config.js
+local-demo.config.json
 **/__pycache__
 **/tests
 *.log

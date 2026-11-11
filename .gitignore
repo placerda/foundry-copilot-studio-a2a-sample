@@ -4,8 +4,7 @@
 node_modules/
 frontend/dist/
 frontend/config.js
-.aws-sam/
-samconfig.toml
+local-demo.config.json
 .env*
 __pycache__/
 *.py[cod]

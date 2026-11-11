@@ -1,4 +1,4 @@
-"""Loopback-only HTTP client host; no Lambda events or model runtime."""
+"""Loopback-only HTTP client host for the authenticated Azure gateway."""
 
 import argparse
 import json

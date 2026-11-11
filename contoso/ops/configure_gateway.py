@@ -77,7 +77,7 @@ def configure(
     values.update(
         CONTOSO_GATEWAY_PHASE="connections", CONTOSO_TENANT_ID=tenant,
         CONTOSO_GATEWAY_AUDIENCE=settings["CONTOSO_ENTRA_API_CLIENT_ID"],
-        CONTOSO_AWS_REQUESTER_CLIENT_ID=requester_client_id, CONTOSO_AWS_REQUESTER_OID=requester["id"],
+        CONTOSO_REQUESTER_CLIENT_ID=requester_client_id, CONTOSO_REQUESTER_OID=requester["id"],
         CONTOSO_MANAGED_AGENT_CLIENT_ID=agents[0][0], CONTOSO_MANAGED_AGENT_OID=agents[0][1],
         CONTOSO_MANAGED_AGENT_IDENTITIES="[]",
         CONTOSO_CONNECTION_PROVIDER_IDS='["studio-copilot-harness"]',

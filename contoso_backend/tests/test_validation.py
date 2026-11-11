@@ -1,4 +1,3 @@
-import base64
 import json
 
 import pytest
@@ -8,32 +7,30 @@ from errors import ChatFailure
 
 
 def event_for(messages, **changes):
-    return {"body": json.dumps({"messages": messages}, ensure_ascii=False),
+    return {"body": json.dumps({"messages": messages}, ensure_ascii=False).encode("utf-8"),
             "headers": {"content-type": "application/json"}, **changes}
 
 
 def test_transport_and_unicode(environment):
-    from validation import decode_transport, validate_messages
+    from validation import decode_json, validate_messages
     settings = Settings.from_env(environment)
     for length in (3999, 4000):
         message = [{"role": "user", "content": "😀" * length}]
         event = event_for(message)
-        assert validate_messages(decode_transport(event), settings) == message
-        event["body"] = base64.b64encode(event["body"].encode()).decode()
-        event["isBase64Encoded"] = True
-        assert validate_messages(decode_transport(event), settings) == message
+        assert validate_messages(decode_json(event["body"], event["headers"]), settings) == message
 
 
 @pytest.mark.parametrize("size,accepted", [(32767, True), (32768, True), (32769, False)])
 def test_exact_body_bytes(size, accepted):
-    from validation import decode_transport
+    from validation import decode_json
     raw = '{"messages":[]}'
-    event = {"body": raw + " " * (size - len(raw)), "headers": {"content-type": "application/json"}}
+    event = {"body": (raw + " " * (size - len(raw))).encode(),
+             "headers": {"content-type": "application/json"}}
     if accepted:
-        assert decode_transport(event) == {"messages": []}
+        assert decode_json(event["body"], event["headers"]) == {"messages": []}
     else:
         with pytest.raises(ChatFailure):
-            decode_transport(event)
+            decode_json(event["body"], event["headers"])
 
 
 @pytest.mark.parametrize("messages", [
@@ -67,14 +64,14 @@ def test_list_limits(count, accepted, environment):
 
 
 @pytest.mark.parametrize("changes", [
-    {"body": "not json"}, {"body": "null"}, {"body": '{"messages":[],"extra":1}'},
-    {"body": '{"messages":[],"messages":[]}'},
-    {"body": "\ud800"}, {"body": "not base64", "isBase64Encoded": True},
-    {"body": "/w==", "isBase64Encoded": True},
+    {"body": b"not json"}, {"body": b"null"}, {"body": b'{"messages":[],"extra":1}'},
+    {"body": b'{"messages":[],"messages":[]}'},
+    {"body": b"\xff"}, {"body": b'{"messages":NaN}'}, {"body": b"[]"},
     {"headers": {"content-type": "text/plain"}},
     {"headers": {"content-type": "application/json", "content-encoding": "gzip"}},
 ])
 def test_invalid_transport(changes):
-    from validation import decode_transport
+    from validation import decode_json
+    event = event_for([], **changes)
     with pytest.raises(ChatFailure):
-        decode_transport(event_for([], **changes))
+        decode_json(event["body"], event["headers"])

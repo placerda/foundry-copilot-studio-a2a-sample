@@ -1,6 +1,6 @@
 # Setup guide
 
-For the current AWS-free local client, follow the Windows startup instructions
+For the local client, follow the Windows startup instructions
 in [README](../README.md) first. This guide's cloud deployment steps describe
 the retained Function reference, not a completed APIM cutover. APIM networking,
 protected OAuth broker/consent, and OBO/SDK feasibility still require validation.
@@ -73,14 +73,22 @@ Use [`stage_gateway.py`](../contoso/ops/stage_gateway.py) and the private public
 
 A client with approved gateway credentials can call the authenticated bridge directly. The reference [`contoso_backend/a2a_requester.py`](../contoso_backend/a2a_requester.py) contains the A2A requester and response parsing.
 
-The optional AWS example uses [`contoso-template.yaml`](../contoso-template.yaml). Use your own named AWS CLI profile and selected project Region. Store its requester credential in AWS Secrets Manager, not a parameter file. The example Lambda Function URL uses transport `AuthType: NONE`, but the handler independently requires and verifies an Entra RS256 bearer token, exact tenant, API audience, delegated scope, and allowed guest OID. It is not an anonymous chat API.
+Use the real loopback Python HTTP backend in
+[`contoso_backend/local_server.py`](../contoso_backend/local_server.py).
+It verifies an Entra RS256 bearer token, exact tenant, API audience,
+delegated scope, and allowed guest OID before calling the configured gateway.
+It is not an anonymous chat API or a locally hosted reasoning agent.
+The cloud gateway uses `CONTOSO_REQUESTER_CLIENT_ID` and
+`CONTOSO_REQUESTER_OID` for the confidential requester's application and
+principal IDs. Supply explicit bindings for a fresh deployment. This sample
+does not update existing identities or deployed configuration.
 
 For the browser, copy [`frontend/config.example.js`](../frontend/config.example.js) to the ignored `frontend/config.js` and fill in your own non-secret SPA settings. Set `CONTOSO_ENABLED` to `true` to show the A2A integration route. Register the exact redirect URI and delegated chat API scope. MSAL tokens stay in memory. The backend exchanges its own requester credential for a gateway token rather than forwarding the browser token across trust boundaries.
 
 ```powershell
 npm ci
 npm run build
-python -m http.server 8000 --directory frontend\dist
+.\start-local.ps1
 ```
 
 ## 5. Validate the intended behavior

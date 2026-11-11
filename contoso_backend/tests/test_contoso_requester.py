@@ -3,16 +3,16 @@ import io
 import json
 import threading
 import time
-from types import SimpleNamespace
 
 import pytest
 import requests
 
-from app import handle
 from contoso_requester import Requester, MAX_DOCUMENT_BYTES, validate_result
 from config import Settings
 from errors import ChatFailure, unauthenticated
-from contoso_backend.tests.test_api import FakeAuth, FakeGraph, event
+from contoso_backend.local_server import ChatService
+from contoso_backend.tests.test_api import FakeAuth
+from validation import validate_contoso_options
 
 TENANT = "44444444-4444-4444-4444-444444444444"
 API = "55555555-5555-5555-5555-555555555555"
@@ -91,20 +91,10 @@ def test_real_two_hop_payload_and_no_user_token(contoso_env, integration, varian
     result = runtime_result(variant)
     worker, session = requester(contoso_env, [FakeResponse(token_result()), FakeResponse(result)])
     options = {"integration": integration, "studio_variant": variant}
-    graph = FakeGraph()
-    auth = FakeAuth()
-    payload = {"messages": [{"role": "user", "content": "old question"},
-                            {"role": "assistant", "content": "old answer"},
-                            {"role": "user", "content": "latest question"}], "contoso_options": options}
-    response = handle(event(body=json.dumps(payload)),
-                      SimpleNamespace(aws_request_id="contoso", get_remaining_time_in_millis=lambda: 90000),
-                      Settings.from_env(contoso_env), auth, graph, worker)
-    assert response["statusCode"] == 200
-    body = json.loads(response["body"])
+    body = worker.invoke("latest question", options, 90000)
     assert body["answer"] == result["answer"]
     assert body["output_limited"] is False
     assert body["contoso"] == {key: value for key, value in result.items() if key != "answer"}
-    assert auth.calls == 1 and not graph.calls
     token_url, token_args = session.calls[0]
     assert token_url == f"https://login.microsoftonline.com/{TENANT}/oauth2/v2.0/token"
     assert token_args["data"] == {"grant_type": "client_credentials", "client_id": CLIENT,
@@ -120,7 +110,7 @@ def test_real_two_hop_payload_and_no_user_token(contoso_env, integration, varian
         assert kwargs["headers"]["Accept-Encoding"] == "identity"
     assert session.calls[0][1]["timeout"][1] <= 8
     for private in (SECRET, SERVICE_TOKEN, TENANT, API, CLIENT):
-        assert private not in response["body"] + caplog.text
+        assert private not in json.dumps(body) + caplog.text
     assert SECRET not in repr(Settings.from_env(contoso_env))
 
 
@@ -159,20 +149,13 @@ def test_flag_exact_string_bool(contoso_env, flag):
         Settings.from_env({**contoso_env, "CONTOSO_ENABLED": flag})
 
 
-def test_disabled_ignores_unused_config_and_preserves_legacy(contoso_env):
+def test_disabled_connection_cannot_invoke_a_requester(contoso_env):
     settings = Settings.from_env({**contoso_env, "CONTOSO_ENABLED": "false", "CONTOSO_GATEWAY_URL": "not a URL"})
     assert settings.contoso is None
-    graph = FakeGraph()
-    result = handle(event(), SimpleNamespace(get_remaining_time_in_millis=lambda: 30000),
-                    settings, FakeAuth(), graph)
-    assert result["statusCode"] == 200 and len(graph.calls) == 1
-    assert "contoso" not in json.loads(result["body"])
     payload = {"messages": [{"role": "user", "content": "q"}], "contoso_options": OPTIONS}
-    result = handle(event(body=json.dumps(payload)),
-                    SimpleNamespace(get_remaining_time_in_millis=lambda: 90000),
-                    settings, FakeAuth(), graph)
-    assert result["statusCode"] == 502 and len(graph.calls) == 1
-    assert "CONTOSO connection is unavailable" in result["body"]
+    with pytest.raises(ChatFailure) as failure:
+        validate_contoso_options(payload, settings)
+    assert failure.value.status == 502
 
 
 @pytest.mark.parametrize("options", [None, {}, "sdk", [], {"integration": "sdk"},
@@ -180,22 +163,19 @@ def test_disabled_ignores_unused_config_and_preserves_legacy(contoso_env):
     {**OPTIONS, "gateway_url": "https://evil.com"}, {**OPTIONS, "caller_id": "other"},
     {"integration": [], "studio_variant": "standard"}])
 def test_options_strict_and_no_fallback(contoso_env, options):
-    graph = FakeGraph()
     worker, session = requester(contoso_env, [])
     payload = {"messages": [{"role": "user", "content": "q"}], "contoso_options": options}
-    result = handle(event(body=json.dumps(payload)),
-                    SimpleNamespace(get_remaining_time_in_millis=lambda: 90000),
-                    Settings.from_env(contoso_env), FakeAuth(), graph, worker)
-    assert result["statusCode"] == 400 and not session.calls and not graph.calls
+    with pytest.raises(ChatFailure) as failure:
+        validate_contoso_options(payload, Settings.from_env(contoso_env))
+    assert failure.value.status == 400 and not session.calls
 
 
 def test_auth_first_even_before_malformed_contoso_transport(contoso_env):
     worker, session = requester(contoso_env, [])
-    graph = FakeGraph()
-    response = handle(event(body="malformed"), SimpleNamespace(),
-                      Settings.from_env(contoso_env), FakeAuth(unauthenticated()), graph, worker)
-    assert response["statusCode"] == 401
-    assert not graph.calls and not session.calls
+    service = ChatService(Settings.from_env(contoso_env), FakeAuth(unauthenticated()), worker)
+    with pytest.raises(ChatFailure) as failure:
+        service.chat(b"malformed", {"content-type": "application/json"}, "request-id")
+    assert failure.value.status == 401 and not session.calls
 
 
 @pytest.mark.parametrize("remaining", [30000, 74999, 79999])

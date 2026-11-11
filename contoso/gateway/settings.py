@@ -21,8 +21,8 @@ def _unique_identity_fields(pairs):
 class GatewaySettings:
     tenant_id: str
     audience: str
-    aws_requester_client_id: str
-    aws_requester_oid: str
+    requester_client_id: str
+    requester_oid: str
     authoring_client_id: str
     authoring_admin_oid: str
     managed_agent_client_id: str
@@ -34,7 +34,7 @@ class GatewaySettings:
 
     def __post_init__(self):
         for name in (
-            "tenant_id", "audience", "aws_requester_client_id", "aws_requester_oid",
+            "tenant_id", "audience", "requester_client_id", "requester_oid",
             "authoring_client_id", "authoring_admin_oid", "managed_agent_client_id",
             "managed_agent_oid",
         ):
@@ -83,8 +83,8 @@ class GatewaySettings:
         fields = {
             "tenant_id": "CONTOSO_TENANT_ID",
             "audience": "CONTOSO_GATEWAY_AUDIENCE",
-            "aws_requester_client_id": "CONTOSO_AWS_REQUESTER_CLIENT_ID",
-            "aws_requester_oid": "CONTOSO_AWS_REQUESTER_OID",
+            "requester_client_id": "CONTOSO_REQUESTER_CLIENT_ID",
+            "requester_oid": "CONTOSO_REQUESTER_OID",
             "authoring_client_id": "CONTOSO_AUTHORING_CLIENT_ID",
             "authoring_admin_oid": "CONTOSO_AUTHORING_ADMIN_OID",
             "managed_agent_client_id": "CONTOSO_MANAGED_AGENT_CLIENT_ID",

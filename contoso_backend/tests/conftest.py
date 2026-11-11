@@ -1,6 +1,5 @@
 import sys
 from pathlib import Path
-from types import SimpleNamespace
 
 import pytest
 
@@ -14,7 +13,7 @@ OWNER = "33333333-3333-3333-3333-333333333333"
 @pytest.fixture
 def environment(monkeypatch):
     values = {"TENANT_ID": TENANT, "API_AUDIENCE": AUDIENCE,
-              "ALLOWED_USER_OID": OWNER, "AWS_REGION": "us-east-2"}
+              "ALLOWED_USER_OID": OWNER}
     for name, value in values.items():
         monkeypatch.setenv(name, value)
     return values
@@ -28,9 +27,3 @@ def no_external_calls(monkeypatch):
         raise AssertionError("External networking is forbidden in unit tests")
 
     monkeypatch.setattr(socket.socket, "connect", deny)
-
-
-@pytest.fixture
-def context():
-    return SimpleNamespace(aws_request_id="test-request",
-                           get_remaining_time_in_millis=lambda: 30000)

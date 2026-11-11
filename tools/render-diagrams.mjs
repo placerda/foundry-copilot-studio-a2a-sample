@@ -257,7 +257,7 @@ detail.box(800, 1870, 500, 150, "Azure VPN gateway", ["Entra-authenticated point
 detail.box(1520, 1870, 500, 150, "Private endpoints + DNS", ["Scoped private DNS for the operator", "Direct endpoint access when authorized"], "private-link")
 detail.arrow([[580, 1945], [800, 1945]], palette.admin, true)
 detail.arrow([[1300, 1945], [1520, 1945]], palette.admin, true)
-detail.text(75, 2055, "No AWS runtime or business-route VPN. Private operator connectivity and NSG/DNS gates require independent acceptance before Function retirement.", 19, 400, 2190)
+detail.text(75, 2055, "Local requester needs no business-route VPN. Private operator connectivity and NSG/DNS gates require independent acceptance before Function retirement.", 19, 400, 2190)
 
 detail.text(60, 2150, "CONNECTIVITY LEGEND", 18, 600, 500)
 for (const [x, label, color, dashed] of [

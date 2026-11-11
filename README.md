@@ -36,7 +36,7 @@ loopback backend now serves static frontend/capabilities with 200 and rejects
 anonymous chat with 401 and an invalid Origin with 403. Authenticated browser
 acceptance still requires the admitted guest's normal Microsoft login.
 
-**Target request path:** browser → loopback Python `/api/chat` → authenticated APIM → private Foundry Hosted agent → Copilot Studio A2A endpoint. Responses return through the same chain. No AWS runtime, Lambda emulation, SAM, model or AWS credential lookup is required for the local client.
+**Target request path:** browser → loopback Python `/api/chat` → authenticated APIM → private Foundry Hosted agent → Copilot Studio A2A endpoint. Responses return through the same chain. The local client does not host a model or reasoning agent.
 
 The browser and real Python HTTP backend share `http://localhost:8000/`. The backend is a requester, not a locally hosted reasoning agent. The chat keeps the conversation prominent. Expand **Delivery proposal** for the synthetic context. **How the agents collaborate** distinguishes loopback HTTP/JSON from A2A 1.0/HTTPS cloud hops. The identity selector shows three choices, with shared delegated selected initially. The backend's `/api/capabilities` keeps automatic initiating-user delegation and SDK S2S disabled with explicit reasons. These adapters and their integrity-protected caller contract are not proven/deployed. Unknown/unavailable selections are rejected without fallback; mode changes clear the conversation. Verified application tenant/object identity is displayed separately from the fixed Studio connection owner, whose live identity is not falsely declared verified.
 
@@ -278,6 +278,32 @@ Follow the [setup guide](docs/setup.md) for prerequisites, identity configuratio
 
 ### Minimal local runtime (Windows)
 
+For an already prepared Windows workstation, run:
+
+```powershell
+.\start-local.ps1
+```
+
+Keep that terminal open and use `http://localhost:8000/` in normal Edge or
+Chrome. Stop the server with Ctrl+C. The launcher starts the actual Python
+frontend/API server, not a static file server. It refuses to replace a process
+already using port 8000 and does not change networking or cloud resources.
+
+Copy `local-demo.config.example.json` to ignored `local-demo.config.json`
+and configure only the public identifiers and fixed Gateway URL.
+Keep the frontend public configuration aligned with its tenant and API
+audience, then rebuild the frontend when it changes. Do not put credentials
+or credential-source overrides in the JSON.
+The requester credential must already be provisioned in the current Windows
+user's protected store under `ContosoAgentDemo:requester:<client-id>`.
+The launcher reads it through the existing backend without printing or
+copying it, prefers `.venv-local` and then `.venv`, and restores process
+environment settings when it exits. It never installs dependencies.
+Run `.\start-local.ps1 -CheckOnly` to check configuration without binding
+a port or making cloud calls.
+
+For initial setup or manual startup:
+
 ```powershell
 python -m venv .venv-local
 .\.venv-local\Scripts\python.exe -m pip install -r contoso_backend\requirements-local.txt
@@ -326,8 +352,13 @@ unit tests. APIM staging infrastructure does not publish either API. A private,
 authorized operator environment must independently prove publication/source
 upload/diagnostics before removing the Function; APIM cannot run those jobs.
 
-The older setup/connectivity walkthroughs below describe retained migration
-assets. They are not required AWS runtime setup or APIM acceptance evidence.
+Gateway deployment bindings use `CONTOSO_REQUESTER_CLIENT_ID` and
+`CONTOSO_REQUESTER_OID`. These are explicit Entra application/principal IDs,
+not the local browser user or the shared Studio connection owner. The sample
+does not rename existing applications or update a running deployment.
+
+The setup and connectivity guides describe retained migration assets, not
+proof that every replacement path has passed live acceptance.
 
 For local checks, use Python 3.12 and Node.js:
 

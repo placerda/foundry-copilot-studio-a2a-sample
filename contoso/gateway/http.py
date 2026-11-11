@@ -200,7 +200,7 @@ class Gateway:
             raise _Failure(401, "unauthenticated", "A valid bearer token is required.")
         settings = self.settings
         if operation in ("invoke", "a2a"):
-            pairs = ((settings.aws_requester_client_id, settings.aws_requester_oid),)
+            pairs = ((settings.requester_client_id, settings.requester_oid),)
             permission, kind = "CONTOSO.Invoke", "workload"
         elif operation in ("prepare", "status"):
             pairs = ((settings.authoring_client_id, settings.authoring_admin_oid),)

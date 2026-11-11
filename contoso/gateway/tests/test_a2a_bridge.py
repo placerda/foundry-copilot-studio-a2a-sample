@@ -151,7 +151,7 @@ def test_only_exact_stateless_a2a_envelope_is_accepted(mutate):
         validate_a2a_request(payload)
 
 
-def test_gateway_a2a_binding_uses_exact_aws_role_and_bridge_off_by_default(setup):
+def test_gateway_a2a_binding_uses_exact_requester_role_and_bridge_off_by_default(setup):
     payload = frame()
     assert request(
         setup, path="/api/a2a", payload=payload, headers={"A2A-Version": "1.0"},

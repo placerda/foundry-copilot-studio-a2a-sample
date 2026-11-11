@@ -1,15 +1,14 @@
 import copy
 import json
-from types import SimpleNamespace
 from uuid import UUID
 
 import pytest
 
 from a2a_requester import A2ARequester, NATIVE_OPTIONS, parse_a2a_result
-from app import handle
 from config import Settings
 from errors import ChatFailure
-from contoso_backend.tests.test_api import FakeAuth, FakeGraph, event
+from contoso_backend.local_server import ChatService
+from contoso_backend.tests.test_api import FakeAuth
 from contoso_backend.tests.test_contoso_requester import (FakeResponse, FakeSession, runtime_result, token_result,
                                 TENANT, API, CLIENT, SECRET, SERVICE_TOKEN)
 
@@ -51,17 +50,14 @@ def test_native_a2a_wire_contract_has_no_command_routing_or_identity(native_env,
     settings = Settings.from_env(native_env)
     session = A2ASession(task=task)
     worker = A2ARequester(settings.contoso, lambda: session)
-    graph = FakeGraph()
     auth = FakeAuth()
     question = "What consumer insight can help?"
     payload = {"messages": [{"role": "user", "content": "previous"},
                             {"role": "assistant", "content": "previous answer"},
                             {"role": "user", "content": question}], "contoso_options": NATIVE_OPTIONS}
-    response = handle(event(body=json.dumps(payload)),
-                      SimpleNamespace(get_remaining_time_in_millis=lambda: 90000),
-                      settings, auth, graph, worker)
-    assert response["statusCode"] == 200 and auth.calls == 1 and not graph.calls
-    result = json.loads(response["body"])
+    result = ChatService(settings, auth, worker).chat(
+        json.dumps(payload).encode(), {"content-type": "application/json"}, "request-id")
+    assert auth.calls == 1
     assert result["answer"] == runtime_result()["answer"]
     assert result["contoso"]["studio_variant"] == "copilot-harness"
     assert result["output_limited"] is False
@@ -87,7 +83,7 @@ def test_native_a2a_wire_contract_has_no_command_routing_or_identity(native_env,
         "acceptedOutputModes": ["text/plain"], "returnImmediately": False}
     assert set(wire["params"]) == {"message", "configuration"}
     for private in (SECRET, SERVICE_TOKEN, TENANT, API, CLIENT):
-        assert private not in response["body"] + caplog.text
+        assert private not in json.dumps(result) + caplog.text
     assert "previous" not in json.dumps(wire)
     assert "integration" not in json.dumps(wire) and "studio_variant" not in json.dumps(wire)
 
@@ -179,29 +175,3 @@ def test_native_runtime_duplicate_json_fields_and_oversized_parts_rejected():
     value["result"]["message"]["parts"] = [{"text": "x" * 262145}]
     with pytest.raises(ChatFailure):
         parse_a2a_result(value, "request-id")
-
-
-def test_lambda_entrypoint_uses_native_adapter_only(native_env, monkeypatch):
-    import app
-    import a2a_requester
-    for name, value in native_env.items():
-        monkeypatch.setenv(name, value)
-    monkeypatch.setattr(app, "_services", None)
-    monkeypatch.setattr("auth.Authorizer", lambda *_: FakeAuth())
-    monkeypatch.setattr("bedrock_client.Model", lambda *_: None)
-    monkeypatch.setattr("graph.build_graph", lambda *_: FakeGraph())
-    calls = []
-
-    class Native:
-        def __init__(self, settings):
-            assert settings.a2a_gateway_url.endswith("/api/a2a")
-        def invoke(self, question, options, remaining_ms):
-            calls.append((question, options, remaining_ms))
-            return parse_a2a_result(envelope(), "request-id")
-
-    monkeypatch.setattr(a2a_requester, "A2ARequester", Native)
-    payload = {"messages": [{"role": "user", "content": "question"}], "contoso_options": NATIVE_OPTIONS}
-    result = app.lambda_handler(event(body=json.dumps(payload)),
-        SimpleNamespace(get_remaining_time_in_millis=lambda: 90000))
-    assert result["statusCode"] == 200
-    assert calls == [("question", NATIVE_OPTIONS, 90000)]
