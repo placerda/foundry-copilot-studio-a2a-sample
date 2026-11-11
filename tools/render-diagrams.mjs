@@ -168,41 +168,73 @@ overview.text(1560, 684, ["Fictional business scenario", "Insight + citations, o
 overview.text(60, 790, "APIM Internal and Credential Manager are the target. Optional Container Apps hosting moves the same UI + backend to Azure.", 20, 400, 2080)
 await overview.save("architecture-overview", "Supplier–Buyer Agent Collaboration overview", "The browser and Python server run on your own computer at localhost:8000. Hosting the same application in Azure Container Apps is optional. APIM Internal and Credential Manager are the proposed gateway target, followed by private Foundry Hosted and delegated Copilot Studio A2A.")
 
-const detail = drawing(2360, 1890)
+const detail = drawing(2360, 2260)
 detail.header("Supplier–Buyer Agent Collaboration", "Run the app on your own computer  |  Container Apps hosting is optional")
-detail.rect(45, 190, 540, 545, "none", "#bdc8d6")
+detail.rect(45, 190, 540, 555, "none", "#bdc8d6")
 detail.text(75, 210, "YOUR COMPUTER  /  LOCAL APP", 20, 600, 460)
 detail.box(80, 275, 440, 155, "Local browser", ["Open http://localhost:8000/", "Sign in with Microsoft"], null, 1)
-detail.box(80, 490, 440, 165, "Local Python server", ["Serves the chat UI + /api/chat", "Runs on your own computer", "Verifies guest, calls APIM"], null)
+detail.box(80, 490, 440, 175, "Local Python server", ["Serves the chat UI + /api/chat", "Runs on your own computer", "Verifies guest, calls APIM"], null)
 detail.arrow([[300, 430], [300, 490]], palette.admin)
 detail.text(320, 436, ["Loopback HTTP / JSON", "localhost:8000"], 18, 400, 240)
-detail.text(75, 674, ["Optional cloud hosting: Container Apps", "Move this same UI + backend to Azure"], 18, 400, 480)
+detail.text(75, 684, ["Optional cloud hosting: Container Apps", "Move this same UI + backend to Azure"], 18, 400, 480)
 
-detail.rect(665, 190, 1300, 930, "none", "#a6c5e8")
+detail.rect(665, 190, 1300, 1300, "none", "#a6c5e8")
 detail.text(695, 210, "AZURE  /  APIM INTERNAL TARGET", 20, 600, 1200)
-detail.box(700, 275, 340, 155, "APIM gateway", ["Private HTTPS + Entra JWT", "Credential Manager for OAuth"], "apim", 2)
+detail.text(700, 280, "SAME REQUEST PATH  /  TWO HOSTING CHOICES", 19, 600, 650)
+detail.text(700, 340, ["Local: Python requester on your computer", "Optional: requester in the Container Apps subnet"], 20, 400, 650)
 detail.box(1420, 275, 420, 155, "Foundry project API", ["Public network disabled", "Private project / agent endpoint"], "foundry")
-detail.arrow([[520, 570], [620, 570], [620, 350], [700, 350]], palette.private)
-detail.text(530, 430, ["Private", "HTTPS", "A2A 1.0"], 18, 400, 90)
 
-detail.rect(680, 465, 1265, 300, "none", "#7aaed6", true)
-detail.text(700, 477, "VNET  /  ISOLATED SUBNETS", 19, 600, 1100)
-detail.box(700, 530, 340, 180, "APIM subnet", ["Dedicated, no delegation", "Developer / Internal VNet", "APIM managed identity"], null, null, "#eaf4ff")
-detail.box(1100, 530, 240, 180, "Foundry PE", ["Shared PE subnet", "account group", "Private HTTPS"], "private-link", null, "#edf7f6")
-detail.box(1420, 530, 420, 180, "Foundry Hosted agent", ["Dedicated injected subnet", "Explicit platform caller gate", "Native Studio A2A provider"], "foundry", 3, "#eaf4ff")
-detail.arrow([[870, 430], [870, 530]], palette.private)
-detail.text(890, 436, "VNet injection", 18, 400, 200)
-detail.arrow([[1040, 620], [1100, 620]], palette.private)
-detail.arrow([[1220, 530], [1220, 350], [1420, 350]], palette.private)
+detail.rect(680, 465, 1265, 980, "none", "#7aaed6", true)
+detail.text(700, 477, "VNET  /  THREE REQUIRED SUBNETS + ONE OPTIONAL CONTAINER APPS SUBNET", 18, 600, 1225)
+detail.rect(700, 530, 340, 280, "none", "#7aaed6", true)
+detail.text(720, 545, "APIM SUBNET", 17, 600, 300)
+detail.text(720, 575, "Dedicated / no delegation", 16, 400, 300)
+detail.box(720, 610, 300, 175, "APIM gateway", ["Entra JWT + private HTTPS", "Credential Manager", "Developer / Internal VNet"], "apim", 2)
+
+detail.rect(1420, 530, 420, 280, "none", "#7aaed6", true)
+detail.text(1440, 545, "FOUNDRY HOSTED SUBNET", 17, 600, 380)
+detail.text(1440, 575, "Dedicated runtime injection", 16, 400, 380)
+detail.box(1440, 610, 380, 175, "Foundry Hosted agent", ["Explicit platform caller gate", "Native Studio A2A provider", "Approved delegated identity"], "foundry", 3)
+
+detail.rect(1090, 530, 280, 840, "none", "#8ec2ba", true)
+detail.text(1110, 545, "SHARED PE SUBNET", 17, 600, 240)
+detail.text(1110, 575, "4 endpoints / no delegation", 16, 400, 240)
+for (const endpoint of [
+  { y: 650, title: "Foundry PE", note: "account group" },
+  { y: 900, title: "Key Vault PE", note: "Protected secrets" },
+  { y: 1050, title: "Registry PE", note: "Registry + data" },
+  { y: 1200, title: "Monitor PE", note: "AMPLS" },
+]) {
+  detail.rect(1110, endpoint.y, 240, 70, "#edf7f6", "#8ec2ba")
+  detail.icon("private-link", 1126, endpoint.y + 14, 40)
+  detail.text(1172, endpoint.y + 10, endpoint.title, 20, 600, 168)
+  detail.text(1172, endpoint.y + 39, endpoint.note, 16, 400, 168)
+}
+detail.text(1110, 1330, "Endpoints, not service hosts", 16, 400, 240)
+
+detail.rect(700, 900, 340, 360, "none", "#7aaed6", true)
+detail.text(720, 915, "CONTAINER APPS SUBNET", 17, 600, 300)
+detail.text(720, 945, "Optional / workload profiles / min /27", 16, 400, 300)
+detail.box(720, 990, 300, 185, "Container Apps", ["UI + Python backend", "Internal environment", "Private HTTPS ingress"], "container-apps")
+detail.text(720, 1200, "Microsoft.App/environments", 16, 400, 300)
+detail.text(720, 1225, "Egress: APIM + private services", 17, 400, 300)
+
+detail.arrow([[520, 570], [600, 570], [600, 680], [720, 680]], palette.private)
+detail.text(610, 590, ["Private", "HTTPS"], 17, 400, 85)
+detail.arrow([[1020, 680], [1110, 680]], palette.private)
+detail.arrow([[1350, 685], [1395, 685], [1395, 350], [1420, 350]], palette.private)
 detail.text(1240, 385, ["Private HTTPS", "Entra bearer"], 18, 400, 165)
-detail.arrow([[1630, 430], [1630, 530]], palette.private)
-detail.text(1650, 445, "Platform dispatch", 18, 400, 215)
+detail.arrow([[1840, 350], [1935, 350], [1935, 690], [1820, 690]], palette.private)
+detail.text(1850, 385, ["Platform", "dispatch"], 18, 400, 140)
+detail.arrow([[1020, 1050], [1065, 1050], [1065, 710], [1020, 710]], palette.private)
+detail.text(720, 830, ["ACA outbound to APIM", "Private HTTPS over the VNet"], 17, 400, 320)
+detail.arrow([[1020, 1130], [1080, 1130], [1080, 1085], [1110, 1085]], palette.private)
 
-detail.rect(2010, 465, 310, 300, "none", "#d4c3e5")
-detail.text(2030, 477, "POWER PLATFORM", 18, 600, 280)
-detail.box(2030, 530, 270, 180, "Copilot Studio", ["Published A2A agent", "Public SaaS endpoint", "MCS.InvokeAsA2A"], "copilot-studio", 4)
-detail.arrow([[1840, 620], [2030, 620]])
-detail.text(1860, 550, ["Public HTTPS", "A2A"], 18, 400, 165)
+detail.rect(2010, 530, 310, 280, "none", "#d4c3e5")
+detail.text(2030, 545, "POWER PLATFORM", 18, 600, 280)
+detail.box(2030, 610, 270, 175, "Copilot Studio", ["Published A2A agent", "Public SaaS endpoint", "MCS.InvokeAsA2A"], "copilot-studio", 4)
+detail.arrow([[1820, 740], [2030, 740]])
+detail.text(1860, 754, ["Public HTTPS", "A2A"], 17, 400, 165)
 
 detail.rect(45, 805, 540, 315, "none", "#bdc8d6")
 detail.icon("dns", 75, 835)
@@ -216,52 +248,49 @@ detail.text(75, 915, [
   "Reuse private DNS and network access",
 ], 21, 400, 480)
 
-detail.text(700, 803, "PRIVATE SERVICE ACCESS  /  CONTAINER APPS HOSTING IS OPTIONAL", 19, 600, 1220)
-detail.box(700, 855, 280, 260, "Container Apps", [
-  "Optional cloud host",
-  "Same UI + backend",
-  "Internal environment",
-  "Dedicated VNet subnet",
-  "No additional PE",
-], "container-apps")
+detail.arrow([[80, 350], [25, 350], [25, 1350], [675, 1350], [675, 1100], [720, 1100]], palette.private, true)
+detail.text(60, 1180, ["Optional cloud path via VPN / ExpressRoute", "Browser to private ACA HTTPS"], 18, 400, 525)
+detail.text(60, 1260, "Local and cloud hosts are alternatives.", 18, 400, 525)
+
+detail.rect(1990, 850, 350, 545, "none", "#a6c5e8")
+detail.text(2010, 868, "AZURE MANAGED SERVICES", 17, 600, 310)
 const services = [
-  { x: 1020, pe: "Key Vault PE", title: "Key Vault", icon: "key-vault", body: ["Keys + approved secrets", "Managed identity"] },
-  { x: 1340, pe: "Registry PE", title: "ACR Premium", icon: "acr", body: ["Private image registry", "Agent AcrPull + digest"] },
-  { x: 1660, pe: "Monitor PE", title: "Azure Monitor", icon: "monitor", body: ["AMPLS + App Insights", "Private Log Analytics"] },
+  { y: 900, title: "Key Vault", icon: "key-vault", body: ["Keys + approved secrets", "Managed identity"] },
+  { y: 1050, title: "ACR Premium", icon: "acr", body: ["Private image registry", "Authorized image pulls"] },
+  { y: 1200, title: "Azure Monitor", icon: "monitor", body: ["AMPLS + App Insights", "Private Log Analytics"] },
 ]
 for (const service of services) {
-  detail.rect(service.x, 855, 280, 65, "#edf7f6", "#8ec2ba")
-  detail.icon("private-link", service.x + 18, 867, 40)
-  detail.text(service.x + 75, 874, service.pe, 22, 600, 195)
-  detail.arrow([[service.x + 140, 920], [service.x + 140, 970]], palette.private, true)
-  detail.box(service.x, 970, 280, 145, service.title, service.body, service.icon)
+  detail.box(2010, service.y, 310, 145, service.title, service.body, service.icon)
+  detail.arrow([[1350, service.y + 35], [2010, service.y + 35]], palette.private, true)
+  detail.text(1500, service.y - 30, "Private Link", 18, 400, 300)
 }
+detail.text(700, 1395, "Three required subnets + optional ACA subnet. Four PEs, with no additional ACA PE.", 18, 400, 1225)
 
-detail.rect(45, 1170, 2275, 535, "none", "#bdc8d6", true)
-detail.text(75, 1190, "OPERATOR AND DEPLOYMENT  /  SEPARATE FROM THE RUNTIME REQUEST", 20, 600, 2190)
-detail.box(80, 1260, 500, 160, "Authorized operator", ["Separate from the business route", "Approved private execution host"], null)
-detail.box(800, 1260, 500, 160, "Private build / deployment runner", ["Build and publish from private network", "APIM does not run publication jobs"], null)
-detail.box(1520, 1260, 500, 160, "Private Azure services", ["Foundry publication + private ACR", "Explicit operator / workload access"], "foundry")
-detail.arrow([[580, 1340], [800, 1340]], palette.admin, true)
-detail.text(605, 1290, "Operator-only", 19, 400, 190)
-detail.arrow([[1300, 1340], [1520, 1340]], palette.private, true)
-detail.text(1310, 1290, "Private HTTPS", 19, 400, 200)
-detail.box(80, 1470, 500, 150, "Optional direct operator path", ["Private diagnostics only", "Not required for the main runtime"], null)
-detail.box(800, 1470, 500, 150, "Existing VPN / ExpressRoute", ["Reuse corporate connectivity", "Private DNS and route controls"], "vpn")
-detail.box(1520, 1470, 500, 150, "Private endpoints + DNS", ["Scoped private DNS for the operator", "Direct endpoint access when authorized"], "private-link")
-detail.arrow([[580, 1545], [800, 1545]], palette.admin, true)
-detail.arrow([[1300, 1545], [1520, 1545]], palette.admin, true)
-detail.text(75, 1655, "APIM Internal / broker cutover and optional Container Apps hosting require acceptance. Existing resources remain unchanged.", 19, 400, 2190)
+detail.rect(45, 1540, 2275, 535, "none", "#bdc8d6", true)
+detail.text(75, 1560, "OPERATOR AND DEPLOYMENT  /  SEPARATE FROM THE RUNTIME REQUEST", 20, 600, 2190)
+detail.box(80, 1630, 500, 160, "Authorized operator", ["Separate from the business route", "Approved private execution host"], null)
+detail.box(800, 1630, 500, 160, "Private build / deployment runner", ["Build and publish from private network", "APIM does not run publication jobs"], null)
+detail.box(1520, 1630, 500, 160, "Private Azure services", ["Foundry publication + private ACR", "Explicit operator / workload access"], "foundry")
+detail.arrow([[580, 1710], [800, 1710]], palette.admin, true)
+detail.text(605, 1660, "Operator-only", 19, 400, 190)
+detail.arrow([[1300, 1710], [1520, 1710]], palette.private, true)
+detail.text(1310, 1660, "Private HTTPS", 19, 400, 200)
+detail.box(80, 1840, 500, 150, "Optional direct operator path", ["Private diagnostics only", "Not required for the main runtime"], null)
+detail.box(800, 1840, 500, 150, "Existing VPN / ExpressRoute", ["Reuse corporate connectivity", "Private DNS and route controls"], "vpn")
+detail.box(1520, 1840, 500, 150, "Private endpoints + DNS", ["Scoped private DNS for the operator", "Direct endpoint access when authorized"], "private-link")
+detail.arrow([[580, 1915], [800, 1915]], palette.admin, true)
+detail.arrow([[1300, 1915], [1520, 1915]], palette.admin, true)
+detail.text(75, 2025, "APIM Internal / broker cutover and optional Container Apps hosting require acceptance. Existing resources remain unchanged.", 19, 400, 2190)
 
-detail.text(60, 1750, "CONNECTIVITY LEGEND", 18, 600, 500)
+detail.text(60, 2120, "CONNECTIVITY LEGEND", 18, 600, 500)
 for (const [x, label, color, dashed] of [
   [60, "Local HTTP / JSON", palette.admin, false],
   [620, "Public HTTPS / A2A", palette.blue, false],
   [1180, "Private cloud traffic", palette.private, false],
   [1740, "Operator only", palette.admin, true],
 ]) {
-  detail.arrow([[x, 1805], [x + 80, 1805]], color, dashed)
-  detail.text(x + 100, 1789, label, 21, 400, 450)
+  detail.arrow([[x, 2175], [x + 80, 2175]], color, dashed)
+  detail.text(x + 100, 2159, label, 21, 400, 450)
 }
-detail.text(60, 1840, "Logical product labels only. Responses return through the same chain. Azure private access does not make Copilot Studio or Entra private.", 20, 400, 2240)
-await detail.save("architecture", "Supplier–Buyer Agent Collaboration connectivity", "Default: local browser and Python server on your own computer at localhost:8000. Optional: host the same UI and backend in Azure Container Apps, with an internal workload profiles environment and dedicated VNet-integration subnet, without an additional private endpoint. APIM Internal with Credential Manager, private Foundry and Studio A2A are the proposed cloud topology, not completed migration evidence. The separate token-exchange panel is omitted for readability.")
+detail.text(60, 2210, "Logical product labels only. Responses return through the same chain. Azure private access does not make Copilot Studio or Entra private.", 20, 400, 2240)
+await detail.save("architecture", "Supplier–Buyer Agent Collaboration connectivity", "Default: local browser and Python server on your own computer at localhost:8000. The VNet has separate APIM, Foundry Hosted and shared private-endpoint subnets. Optional Container Apps hosting adds its own delegated environment subnet for private ingress and VNet egress to APIM and private services. The internal environment requires no additional private endpoint. Managed services remain outside the VNet. APIM Internal with Credential Manager, private Foundry and Studio A2A are the proposed cloud topology, not completed migration evidence. The separate token-exchange panel is omitted for readability.")

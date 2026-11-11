@@ -48,6 +48,9 @@ workload profiles environment. Use an internal environment with app ingress
 accessible from the VNet, not restricted to the environment's apps.
 The environment's internal load balancer provides private HTTPS access.
 VNet integration also provides access to Internal APIM and private ACR.
+The same dedicated environment subnet provides VNet integration and outbound
+access to APIM and private services. It is not shared with the Foundry Hosted
+subnet, and it does not need another subnet just for egress.
 This option needs **no additional Container Apps private endpoint**:
 the total remains four private endpoints, with either hosting choice.
 Configure the environment's default-domain private DNS to resolve to its
@@ -55,6 +58,19 @@ internal IP, and preserve required platform egress.
 Reuse corporate VPN/ExpressRoute and private DNS for private clients and
 operators. Internal APIM is not reachable through the old public-ingress
 assumption, whether the client is local or cloud-hosted.
+
+The [detailed diagram](architecture.svg) shows each subnet explicitly:
+
+| Subnet | Purpose | Included |
+|---|---|---|
+| APIM | Internal gateway, no subnet delegation | Always |
+| Foundry Hosted | Dedicated VNet-injected agent runtime | Always |
+| Shared private endpoints | Foundry, Key Vault, ACR and AMPLS endpoints | Always |
+| Container Apps | Dedicated environment subnet for VNet integration, private ingress and egress | Optional cloud host |
+
+Managed services remain outside the VNet. Their private endpoints are inside
+the shared endpoint subnet. For Container Apps, the internal environment's
+load balancer supplies private ingress instead of an additional endpoint.
 
 Credential Manager replaces the custom Function broker and its dedicated
 host/token-state storage in this target, not in the live deployment. It needs
@@ -66,6 +82,8 @@ No existing Function or storage retirement is authorized by this diagram.
 See Microsoft's [Credential Manager overview](https://learn.microsoft.com/azure/api-management/credentials-overview),
 [APIM Internal networking](https://learn.microsoft.com/azure/api-management/api-management-using-with-internal-vnet)
 and [Container Apps networking](https://learn.microsoft.com/azure/container-apps/networking).
+See [Container Apps VNet and subnet requirements](https://learn.microsoft.com/azure/container-apps/custom-virtual-networks)
+for the dedicated environment subnet and its outbound integration.
 Documented platform capabilities do not replace acceptance of this Studio
 connection, token facade, Router cutover or proposed client host.
 

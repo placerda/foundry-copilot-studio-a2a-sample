@@ -48,6 +48,12 @@ Your local Python server hosts the chat UI and calls APIM. Foundry routes suppor
 
 The diagrams show the target APIM architecture. The Credential Manager migration and optional cloud hosting are not completed deployments.
 
+### Network detail
+
+The optional Container Apps environment has its own delegated VNet subnet for outbound access to APIM and private services.
+
+![Detailed VNet with APIM, Foundry, shared private endpoints and the optional Container Apps subnet](docs/architecture.svg)
+
 ## Need help?
 
 | Problem | What to do |
