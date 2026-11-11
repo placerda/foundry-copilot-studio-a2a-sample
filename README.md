@@ -6,11 +6,101 @@ The Foundry agent routes registered questions to Copilot Studio, preserves sourc
 
 The four [configured scenarios](contoso-demo/scenarios.json) cover proposal assessment, acceptance conditions and evidence limits, an unsupported penalty amount, and an approval request that must return no-match. The active source is [supplier delivery terms](contoso-demo/knowledge/supplier-delivery-terms.md), `CONTOSO-DEMO-SUPPLIER-001`, version 1. All business data is synthetic; local test responses are not live acceptance evidence.
 
+## Start here
+
+**To open the application, start the Python server with `start-local.ps1`, then open `http://localhost:8000/` in your browser.** `npm run build` only builds the frontend. The test commands do not start the application.
+
+The local application serves both the browser UI and `/api/chat` on port 8000. It connects to an already configured Azure gateway and agents. It does not create cloud resources or run an AI model locally.
+
+**Default: run the application on your own computer.** Your browser and the Python server run on that same machine. **Optional: host this entire chat application, UI and Python backend together, in Azure App Service** so the client also runs in the cloud. App Service is not required for local use and is not an extra backend. Foundry and Copilot Studio remain cloud services in either option.
+
+### Minimal local runtime (Windows)
+
+For a prepared workstation:
+
+1. Open PowerShell in this repository's root folder, where `README.md` and `start-local.ps1` are located.
+2. Start the application:
+
+   ```powershell
+   .\start-local.ps1
+   ```
+
+3. Keep that PowerShell window open. When the launcher prints `Open http://localhost:8000/`, open **[http://localhost:8000/](http://localhost:8000/)** in Edge or Chrome.
+4. Select **Sign in with Microsoft** and use the approved guest account. Choose a delivery-proposal question and send it in the chat. Only the configured shared delegated connection is enabled.
+5. To stop the application, return to its PowerShell window and press **Ctrl+C**.
+
+If port 8000 is already occupied, the launcher refuses to start another server and preserves the existing process. Open the URL to use the application already running there. Do not stop an unrelated process to free the port.
+
+The launcher prefers `.venv-local`, then `.venv`. It validates the frontend build, public configuration and protected Windows credential before starting `python -m contoso_backend.local_server`. It does not install dependencies, deploy resources or change networking.
+
+### First-time local preparation
+
+You need Windows, PowerShell 5.1 or later, Python 3.12 or later, and Node.js/npm. The Azure gateway, agents, Entra applications, invocation permissions and approved guest access must already be prepared through the [setup guide](docs/setup.md). This sample is **not a one-command cloud deployment**.
+
+From the repository root, create the minimal Python environment and install the frontend dependencies:
+
+```powershell
+python -m venv .venv-local
+.\.venv-local\Scripts\python.exe -m pip install -r contoso_backend\requirements-local.txt
+npm ci
+```
+
+Create the ignored configuration files only if they do not already exist:
+
+```powershell
+if (-not (Test-Path frontend\config.js)) {
+    Copy-Item frontend\config.example.js frontend\config.js
+}
+if (-not (Test-Path local-demo.config.json)) {
+    Copy-Item local-demo.config.example.json local-demo.config.json
+}
+```
+
+Edit both files with the approved **public** tenant, application, user and gateway bindings. Keep the frontend tenant, SPA client and API scope aligned with the backend configuration. Do not put passwords, client secrets, tokens or credential-source overrides in either file.
+
+The backend's requester credential must already be provisioned in the current Windows user's protected store under `ContosoAgentDemo:requester:<client-id>`, matching the configured requester application. The launcher reads that exact credential without printing or copying it. If it is missing, complete the authorized credential setup before continuing. Do not export a cloud secret into the repository.
+
+Build the frontend and check the local prerequisites:
+
+```powershell
+npm run build
+.\start-local.ps1 -CheckOnly
+```
+
+`-CheckOnly` does not start a server or make cloud calls. After it reports `Local configuration and protected Windows credential are ready.`, run `.\start-local.ps1` and open **http://localhost:8000/** as described above.
+
+### If the application does not open
+
+| Symptom | Action |
+|---|---|
+| Browser cannot connect to localhost | Start `.\start-local.ps1` and keep its terminal open. Wait for the startup message before opening the URL. |
+| Port 8000 is already in use | Open the existing application at `http://localhost:8000/`. The launcher deliberately does not replace its process. |
+| Frontend build is missing | Configure `frontend\config.js`, then run `npm run build`. |
+| Public configuration is missing or invalid | Complete `local-demo.config.json` using the example's allowed fields. Do not add credentials. |
+| Protected requester credential is missing or mismatched | Have the authorized setup provision the correct Windows credential for this requester. There is no fallback identity. |
+| Signed in, but chat says the user has no access | Sign-in alone does not grant chat access. The local backend requires the signed-in user's object ID in this tenant to match `ALLOWED_USER_OID`, and the access token must include `access_as_user`. Verify the approved configuration, not just the login status. |
+| Other Microsoft sign-in or chat authorization failure | Use the approved account and verify the configured Entra applications, API scope and invocation access. Do not enable another identity mode as a workaround. |
+
 ## Architecture
 
 ![High-level Foundry and Copilot Studio A2A architecture](docs/architecture-overview.svg)
 
-Read the numbered target stages from left to right: **1** local browser and Python client, **2** authenticated APIM, **3** private Foundry Hosted agent, **4** published Copilot Studio agent. The APIM foundation and protected business policy have been deployed in the reference environment; six live negative authentication/routing checks passed. Credential Manager and positive end-to-end cutover remain pending; the target diagrams are not evidence of complete acceptance.
+Read the numbered stages from left to right: **1** the local chat application on your own computer (browser and Python server), **2** authenticated API Management (APIM), **3** private Foundry Hosted agent, **4** published Copilot Studio agent. App Service is only an optional cloud host for the same stage 1 application.
+
+**Local request path:** browser → Python server at `http://localhost:8000/` → configured APIM gateway → private Foundry Hosted agent → Copilot Studio A2A endpoint. Responses return through the same chain. The proposed gateway target is APIM Developer in Internal VNet mode with Credential Manager, not a claim that this cutover is complete.
+
+**APIM, not APIC:** API Management is the traffic gateway and hosts Credential Manager for the shared delegated OAuth/PKCE connection. Azure API Center (APIC) is a separate catalog, not a request proxy or token broker. Catalog discovery is not an implemented hop in this sample.
+
+**Optional all-cloud application hosting:** move the same chat UI and Python backend from your computer to App Service. Users then open its HTTPS URL instead of localhost. This does not add another agent or duplicate the chat backend. Local execution uses [`start-local.ps1`](start-local.ps1) and needs no App Service. Cloud hosting still requires adapting the loopback Host/Origin checks and Windows credential access, configuring HTTPS/Entra redirects and private networking, and completing acceptance. The launcher is not an App Service deployment script.
+
+**No Functions in the target application path:** APIM provides the API gateway and Credential Manager replaces the custom OAuth broker and its dedicated host/token-state storage. Build and publication use a separate authorized private workstation or runner, not APIM. Credential Manager requires controlled HTTPS egress to its managed service (`AzureConnectors`), Entra and the configured OAuth endpoints. The diagrams show the proposed topology, not a completed migration. Existing Functions and storage remain unchanged until replacement acceptance and separate retirement approval.
+
+<details>
+<summary>Current implementation and migration evidence (advanced)</summary>
+
+### Current implementation and migration status
+
+The APIM foundation and protected business policy have been deployed in the reference environment, with external ingress rather than the proposed Internal mode. Six live negative authentication/routing checks passed. Complete Credential Manager/Router cutover, Internal-mode networking and App Service hosting remain pending. A local client needs corporate connectivity and private DNS to reach an Internal APIM gateway, even though the retained external-ingress path did not require a client VPN.
 
 The live JSON request representation fix now accepts valid framing while
 rejecting invalid envelopes. Authorized business calls initially returned
@@ -36,7 +126,7 @@ loopback backend now serves static frontend/capabilities with 200 and rejects
 anonymous chat with 401 and an invalid Origin with 403. Authenticated browser
 acceptance still requires the admitted guest's normal Microsoft login.
 
-**Target request path:** browser → loopback Python `/api/chat` → authenticated APIM → private Foundry Hosted agent → Copilot Studio A2A endpoint. Responses return through the same chain. The local client does not host a model or reasoning agent.
+**Current local client:** browser → loopback Python `/api/chat` → the configured authenticated gateway. The APIM binding forwards the native A2A request to Foundry. This client remains local and does not establish that the App Service alternative or replacement token path has been accepted.
 
 The browser and real Python HTTP backend share `http://localhost:8000/`. The backend is a requester, not a locally hosted reasoning agent. The chat keeps the conversation prominent. Expand **Delivery proposal** for the synthetic context. **How the agents collaborate** distinguishes loopback HTTP/JSON from A2A 1.0/HTTPS cloud hops. The identity selector shows three choices, with shared delegated selected initially. The backend's `/api/capabilities` keeps automatic initiating-user delegation and SDK S2S disabled with explicit reasons. These adapters and their integrity-protected caller contract are not proven/deployed. Unknown/unavailable selections are rejected without fallback; mode changes clear the conversation. Verified application tenant/object identity is displayed separately from the fixed Studio connection owner, whose live identity is not falsely declared verified.
 
@@ -239,13 +329,15 @@ request fields. The currently deployed SDK8 is unchanged. Using this source
 requires separately validated runtime configuration and image deployment,
 and does not resolve the observed Studio HTTP 405 or enable SDK S2S.
 
-The diagram uses unmodified official Microsoft Azure and Power Platform product icons stored locally. Browser-to-backend is loopback HTTP/JSON. Both backend-to-Foundry (via APIM) and Foundry-to-Copilot Studio use A2A 1.0 / JSON-RPC 2.0 over HTTPS, with protocol-preserving Foundry HTTP passthrough.
+</details>
+
+The diagrams use unmodified official Microsoft Azure and Power Platform product icons stored locally. Browser-to-backend is loopback HTTP/JSON on your computer. Only the optional App Service host changes that hop to HTTPS. Both backend-to-Foundry (via APIM) and Foundry-to-Copilot Studio use A2A 1.0 / JSON-RPC 2.0 over HTTPS, with protocol-preserving Foundry HTTP passthrough.
 
 ## Detailed connectivity
 
 ![Complete connectivity architecture](docs/architecture.svg)
 
-The detailed view uses the same four stage numbers. It separates public HTTPS, private VNet traffic, identity exchange, and optional operator connectivity, including subnet boundaries, Private Link, private DNS, storage, container registry, and monitoring.
+The detailed view uses the same four stage numbers. The **Your computer** block contains the local browser and Python server. The remaining blocks separate private APIM/Foundry traffic, public SaaS calls, Credential Manager token exchange and private operator connectivity. Foundry, Key Vault, Container Registry and Azure Monitor have private-endpoint attachments in the target. **Only the optional App Service deployment** adds the fifth private endpoint and a dedicated outbound-integration subnet for the same stage 1 application. It is not another instance required by local use. APIM Internal uses VNet injection rather than another private endpoint. The old Function and its broker storage are not target components.
 
 [Connectivity guide](docs/connectivity.md) · [Setup guide](docs/setup.md) · [Overview PNG](docs/architecture-overview.png) · [Detailed PNG](docs/architecture.png)
 
@@ -272,48 +364,7 @@ An exported profile is not proof of private HTTPS or telemetry access.
 | Local Python HTTP requester and authenticated browser client | [`contoso_backend/local_server.py`](contoso_backend/local_server.py), [`frontend/`](frontend/) |
 | Synthetic questions and source documents | [`contoso-demo/`](contoso-demo/) |
 
-## Start here
-
-Follow the [setup guide](docs/setup.md) for prerequisites, identity configuration, infrastructure, and publication. This is a reference sample with explicit deployment bindings, **not a one-command deployment**. No credentials, deployed resource identifiers, or operator history are included.
-
-### Minimal local runtime (Windows)
-
-For an already prepared Windows workstation, run:
-
-```powershell
-.\start-local.ps1
-```
-
-Keep that terminal open and use `http://localhost:8000/` in normal Edge or
-Chrome. Stop the server with Ctrl+C. The launcher starts the actual Python
-frontend/API server, not a static file server. It refuses to replace a process
-already using port 8000 and does not change networking or cloud resources.
-
-Copy `local-demo.config.example.json` to ignored `local-demo.config.json`
-and configure only the public identifiers and fixed Gateway URL.
-Keep the frontend public configuration aligned with its tenant and API
-audience, then rebuild the frontend when it changes. Do not put credentials
-or credential-source overrides in the JSON.
-The requester credential must already be provisioned in the current Windows
-user's protected store under `ContosoAgentDemo:requester:<client-id>`.
-The launcher reads it through the existing backend without printing or
-copying it, prefers `.venv-local` and then `.venv`, and restores process
-environment settings when it exits. It never installs dependencies.
-Run `.\start-local.ps1 -CheckOnly` to check configuration without binding
-a port or making cloud calls.
-
-For initial setup or manual startup:
-
-```powershell
-python -m venv .venv-local
-.\.venv-local\Scripts\python.exe -m pip install -r contoso_backend\requirements-local.txt
-npm ci
-Copy-Item frontend\config.example.js frontend\config.js
-# Fill only public tenant, SPA client and API scope in ignored config.js.
-npm run build
-# Load the backend process environment from approved local secret storage.
-.\.venv-local\Scripts\python.exe -m contoso_backend.local_server
-```
+## Runtime and migration configuration
 
 Required backend process variables: `TENANT_ID`, `API_AUDIENCE`,
 `ALLOWED_USER_OID`, `CONTOSO_ENTRA_TENANT_ID`, `CONTOSO_GATEWAY_API_CLIENT_ID`,
@@ -360,7 +411,11 @@ does not rename existing applications or update a running deployment.
 The setup and connectivity guides describe retained migration assets, not
 proof that every replacement path has passed live acceptance.
 
-For local checks, use Python 3.12 and Node.js:
+### Development checks (do not start the application)
+
+The commands below install development dependencies, run tests and build the frontend. They do **not** start `http://localhost:8000/`. For normal use on a prepared Windows workstation, run `.\start-local.ps1` as described in [Minimal local runtime (Windows)](#minimal-local-runtime-windows).
+
+Use Python 3.12 and Node.js:
 
 ```powershell
 python -m venv .venv
