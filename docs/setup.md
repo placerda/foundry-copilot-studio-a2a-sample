@@ -189,8 +189,20 @@ acceptance. Do not describe an old suite as a test of unpublished changes.
 
 ## Diagrams and historical tooling
 
-The current diagrams are the Mermaid blocks in [README](../README.md#how-the-current-demo-works)
-and [connectivity](connectivity.md). Edit those with the corresponding prose.
+The README opens with the [icon-based overview](contoso-motors-architecture.svg),
+with a [PNG](contoso-motors-architecture.png) and
+[editable Excalidraw source](contoso-motors-architecture.excalidraw).
+Its generator embeds unmodified official product icons and checks text widths
+and connector/text intersections before rendering the PNG:
+
+```powershell
+node tools\render-motors-architecture.mjs --png
+```
+
+Use the existing Node.js and Playwright environment. Omit `--png` to generate
+only SVG and Excalidraw. The Mermaid flows in
+[README](../README.md#how-the-current-demo-works) and [connectivity](connectivity.md)
+remain complementary technical views. Keep all current views and prose consistent.
 
 `tools\render-diagrams.mjs` and the older `docs/architecture*.svg`, `.png`
 and `.excalidraw` assets describe an earlier Internal-APIM target. They are

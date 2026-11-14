@@ -7,6 +7,10 @@ This is the **configured Contoso Motors demo**, based on the latest recorded
 acceptance on 2026-11-13. It is not a claim that a fresh clone reproduces it,
 nor a new live Azure audit. See [source availability](status.md#source-availability).
 
+For a product-icon view of the same scenario, open the
+[Contoso Motors architecture overview](contoso-motors-architecture.svg).
+The sequence and network views below provide complementary detail.
+
 ## Components and responsibilities
 
 | Component | Responsibility | Does not do |

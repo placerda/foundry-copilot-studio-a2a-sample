@@ -7,6 +7,15 @@ Answers explain fictional delivery and returnable-packaging conditions, with
 versioned source references. The agents do not approve purchases, verify stock
 or book transport.
 
+## Overview
+
+[![Contoso Motors architecture: Teams and local chat, Foundry Router, API Center discovery, APIM specialist routes, Copilot Studio supplier, logistics agent and private connectivity](docs/contoso-motors-architecture.png)](docs/contoso-motors-architecture.svg)
+
+The configured demo at a glance, with separate message, discovery and network
+paths. [Open the vector diagram](docs/contoso-motors-architecture.svg) or
+[download the editable source](docs/contoso-motors-architecture.excalidraw).
+The step-by-step flow remains in [How the current demo works](#how-the-current-demo-works).
+
 > **Read this first:** the configured demo is ahead of the source published on
 > `main`. This documentation describes both and labels the difference.
 > A fresh clone does **not** yet reproduce the complete current Motors demo.
