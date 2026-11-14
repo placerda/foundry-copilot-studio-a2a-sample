@@ -1,152 +1,167 @@
-# Supplier–Buyer Agent Collaboration: connectivity
+# Architecture and connectivity
 
-The [README](../README.md) starts the chat application on your own computer:
-the browser and Python server share `http://localhost:8000/`. Azure Container Apps is
-an optional way to host that entire UI/backend in the cloud, not a prerequisite
-or another chat backend. This guide separates the APIM cloud target from
-the retained Function implementation, which remains until replacement acceptance.
-The identity selector defaults to the fixed shared delegated connection;
-automatic user delegation and SDK S2S remain disabled, not working paths.
+[Home](../README.md) · [Setup](setup.md) · [Demo](demo.md) ·
+[Operations](operations.md) · [Status](status.md)
 
-The main integration direction is **Microsoft Foundry → Copilot Studio through A2A**. There is no reverse Studio-to-Foundry trigger, Power Automate flow, or Microsoft 365 channel in this implementation.
+This is the **configured Contoso Motors demo**, based on the latest recorded
+acceptance on 2026-11-13. It is not a claim that a fresh clone reproduces it,
+nor a new live Azure audit. See [source availability](status.md#source-availability).
 
-The [four synthetic B2B scenarios](../contoso-demo/scenarios.json) use the `supplier-delivery-terms` capability and [versioned supplier source](../contoso-demo/knowledge/supplier-delivery-terms.md). The approval request has no matching capability: it must not invoke a provider or claim a buyer approval. Source attribution and authorization are preserved across the same numbered stages **1–4** shown in the [overview](architecture-overview.svg) and [detailed diagram](architecture.svg). The agents explain conditions; they do not create orders or dispatch goods.
+## Components and responsibilities
 
-## Target topology (cutover pending)
-
-| Connection | Network / protocol | Authorization |
+| Component | Responsibility | Does not do |
 |---|---|---|
-| Browser → local Python UI/backend on your computer | Loopback HTTP/JSON at `http://localhost:8000/` | Microsoft Entra sign-in and verified guest admission |
-| Optional: browser → same UI/backend hosted in Container Apps | Private HTTPS through the environment's internal load balancer instead of the local loopback hop | Microsoft Entra sign-in and verified guest admission |
-| Client backend → APIM | Private HTTPS, A2A 1.0 / JSON-RPC 2.0 | Fixed requester application identity and invocation-only access |
-| APIM → Foundry project / Hosted endpoint | VNet injection → Foundry private endpoint, HTTPS | APIM managed identity, scoped Foundry role and explicit Router caller admission |
-| Hosted runtime → APIM token API | Private HTTPS, separate from the business route | Exact Hosted identity and connection-use role, never the client requester |
-| APIM Credential Manager → OAuth provider | Controlled public HTTPS, including the `AzureConnectors` service tag | Shared delegated OAuth/PKCE connection, approved owner consent and managed refresh |
-| Hosted runtime → Copilot Studio | Public HTTPS, native A2A | Approved delegated `MCS.InvokeAsA2A` token |
-| Private workstation/runner → Azure services | Existing corporate connectivity, private DNS and HTTPS | Explicit operator and workload authorization |
+| Local browser and Python backend | Sign-in, approved-user admission, chat UI and confidential requester | Run an AI model locally or forward the browser token to Studio |
+| Microsoft Teams | Native messaging entry to the Router | Depend on localhost or the retired Function |
+| Foundry Hosted Router | Classify registered questions, discover a specialist and validate its answer | Approve purchases or choose arbitrary caller-supplied endpoints |
+| API Center | Authenticated per-request inventory and routing metadata | Proxy messages, issue tokens or grant callers access |
+| APIM | Enforce caller/schema limits and apply destination credentials | Execute the LLM or run private build/publication jobs |
+| Copilot Studio supplier | Explain the synthetic delivery proposal and acceptance conditions | Verify inventory, invent penalties or approve changes |
+| Foundry logistics Prompt Agent | Explain receiving and returnable-packaging coordination | Book transport or treat trim-set quantities as packaging counts |
 
-APIM is **API Management**, the gateway and managed OAuth broker. APIC is
-**API Center**, a separate catalog, not another gateway or a token service.
-APIC discovery is not implemented in the current request path.
+## Request and credential flow
 
-The default client runs the chat UI and Python requester on your own computer,
-not an AI model. Use `start-local.ps1` and open `http://localhost:8000/`.
-Container Apps is an optional Azure host for that same complete application.
-One container image contains the chat UI and Python backend, reusing the existing
-ACR. It replaces the local application host, not the agents or gateway.
-The user's browser still runs on their own computer and opens the application's
-private HTTPS URL. Cloud hosting requires container packaging, adapting the
-loopback listener/Host/Origin checks and Windows credential access, Entra redirects
-and private connectivity. The Windows launcher is not an Azure deployment script.
-
-The APIM target with a local client uses three cloud subnets: Foundry Hosted,
-APIM Internal without delegation, and shared private endpoints. Foundry,
-Key Vault, ACR and AMPLS have four private-endpoint attachments.
-Only the optional Container Apps host adds a fourth subnet, dedicated and
-delegated to `Microsoft.App/environments`, with a minimum size of `/27` for a
-workload profiles environment. Use an internal environment with app ingress
-accessible from the VNet, not restricted to the environment's apps.
-The environment's internal load balancer provides private HTTPS access.
-VNet integration also provides access to Internal APIM and private ACR.
-The same dedicated environment subnet provides VNet integration and outbound
-access to APIM and private services. It is not shared with the Foundry Hosted
-subnet, and it does not need another subnet just for egress.
-This option needs **no additional Container Apps private endpoint**:
-the total remains four private endpoints, with either hosting choice.
-Configure the environment's default-domain private DNS to resolve to its
-internal IP, and preserve required platform egress.
-Reuse corporate VPN/ExpressRoute and private DNS for private clients and
-operators. Internal APIM is not reachable through the old public-ingress
-assumption, whether the client is local or cloud-hosted.
-
-The [detailed diagram](architecture.svg) shows each subnet explicitly:
-
-| Subnet | Purpose | Included |
-|---|---|---|
-| APIM | Internal gateway, no subnet delegation | Always |
-| Foundry Hosted | Dedicated VNet-injected agent runtime | Always |
-| Shared private endpoints | Foundry, Key Vault, ACR and AMPLS endpoints | Always |
-| Container Apps | Dedicated environment subnet for VNet integration, private ingress and egress | Optional cloud host |
-
-Managed services remain outside the VNet. Their private endpoints are inside
-the shared endpoint subnet. For Container Apps, the internal environment's
-load balancer supplies private ingress instead of an additional endpoint.
-
-Credential Manager replaces the custom Function broker and its dedicated
-host/token-state storage in this target, not in the live deployment. It needs
-outbound HTTPS to its managed service and OAuth provider. Studio and Entra
-remain public SaaS services. APIM cannot execute image builds or publication
-jobs, which need a separately authorized private execution environment.
-No existing Function or storage retirement is authorized by this diagram.
-
-See Microsoft's [Credential Manager overview](https://learn.microsoft.com/azure/api-management/credentials-overview),
-[APIM Internal networking](https://learn.microsoft.com/azure/api-management/api-management-using-with-internal-vnet)
-and [Container Apps networking](https://learn.microsoft.com/azure/container-apps/networking).
-See [Container Apps VNet and subnet requirements](https://learn.microsoft.com/azure/container-apps/custom-virtual-networks)
-for the dedicated environment subnet and its outbound integration.
-Documented platform capabilities do not replace acceptance of this Studio
-connection, token facade, Router cutover or proposed client host.
-
-## Retained Function runtime and identity
-
-The following reference describes the retained Function path, not the target
-diagram. Existing resources and their publication dependencies remain unchanged.
-
-| Connection | Network / protocol | Authorization |
-|---|---|---|
-| Browser → optional external requester | Public HTTPS | Entra delegated bearer, exact guest, scope, issuer, and audience |
-| External requester → Azure Functions gateway | Public HTTPS, native A2A bridge | Requester application credential exchanged for a gateway access token |
-| Gateway → Foundry project / Hosted agent endpoint | VNet integration → Foundry private endpoint, HTTPS | Gateway managed identity, scoped Foundry role |
-| Foundry platform → Hosted runtime | Platform dispatch into the injected Hosted subnet | Explicit platform caller allowlist |
-| Hosted runtime → gateway connection broker | Gateway's authenticated **public** HTTPS listener | Actual Hosted managed identity and `CONTOSO.Connection.Use` |
-| Broker → Entra OAuth endpoint | Public HTTPS | Approved guest consent, bound callback, protected refresh state |
-| Hosted runtime → Copilot Studio A2A endpoint | Public outbound HTTPS to `api.powerplatform.com` | Delegated `MCS.InvokeAsA2A` token |
-| Broker / gateway → source and token storage | Blob private endpoint, HTTPS | Managed identity and container-scoped roles, protected token state |
-| Gateway → host package storage | Separate host Blob private endpoint, HTTPS | Managed identity |
-| Hosted platform → ACR | Registry and data private endpoints, HTTPS | Registry connection plus actual agent `AcrPull` |
-| Gateway / Foundry telemetry → Azure Monitor | AMPLS private endpoint, HTTPS | Entra-authenticated ingestion, private workspace |
-
-The gateway's public listener is intentional. VNet integration supplies **outbound** private connectivity, not a private inbound listener. Managed identity provides authorization but does not replace network reachability.
-
-Copilot Studio and Entra remain public SaaS destinations reached over TLS. The sample does not claim that the complete end-to-end route is private. The external requester calls the authenticated HTTPS gateway without a site-to-site tunnel.
-
-## Retained Function network topology
-
-The checked reference uses three separate subnets inside one Azure VNet. Hosted agents and the Flex gateway each have a dedicated `Microsoft.App/environments` delegation. The private-endpoint subnet has no service delegation. An optional point-to-site VPN uses a separate `GatewaySubnet`.
-
-Foundry, ACR, both Storage accounts, and Azure Monitor are managed services attached through Private Link. They are not VMs inside the subnet. The Hosted runtime is the VNet-injected component.
-
-Nine private DNS zones are linked to the VNet:
-
-```text
-privatelink.cognitiveservices.azure.com
-privatelink.openai.azure.com
-privatelink.services.ai.azure.com
-privatelink.azurecr.io
-privatelink.blob.core.windows.net
-privatelink.monitor.azure.com
-privatelink.oms.opinsights.azure.com
-privatelink.ods.opinsights.azure.com
-privatelink.agentsvc.azure-automation.net
+```mermaid
+sequenceDiagram
+    participant User as Browser user
+    participant Local as Local Python backend
+    participant APIM as API Management
+    participant Router as Foundry Hosted Router
+    participant Catalog as API Center
+    participant Specialist as Supplier or logistics
+    User->>Local: Question + delegated application API token
+    Local->>APIM: A2A request + requester application Bearer
+    APIM->>Router: Invocation + APIM managed-identity token
+    Router->>Catalog: Read inventory with Router managed identity
+    Catalog-->>Router: Validated capability, endpoint and source metadata
+    Router->>APIM: Specialist A2A request + Router application token
+    APIM->>Specialist: Destination-specific credential
+    Specialist-->>APIM: Answer and citations
+    APIM-->>Router: Bounded A2A response
+    Router-->>APIM: Validated answer on entry request
+    APIM-->>Local: Validated answer
+    Local-->>User: Answer with source attribution
 ```
 
-The Blob zone is shared by both storage private endpoints and the monitoring connection. Queue and Table zones are additional opt-in resources, not part of the baseline.
+Teams replaces the first three steps with native Activity delivery into the
+same Router business flow. Replies return through the M365 Agents SDK Connector.
+The local Python process is not on the Teams path.
 
-Subnet NSGs and outbound rules must preserve platform-required traffic, Azure DNS, and public HTTPS to the gateway, Entra, and Copilot Studio. The reference Bicep does not manage deployment-specific NSGs. Apply and review those separately rather than claiming an unimplemented firewall or fixed IP allowlist.
+### The identities are different
 
-## Retained deployment and operator paths
+| Boundary | Credential / admission |
+|---|---|
+| Browser → local API | Entra delegated token with exact tenant, audience, scope and approved user |
+| Python → APIM entry API | Separate requester application identity. Current demo uses a certificate to obtain its Bearer token |
+| APIM → Router | APIM managed identity and Router platform caller admission |
+| Teams → Router | Foundry-verified request context, M365 endpoint authorization and a separate Teams caller allowlist |
+| Router → API Center | Actual Router managed identity with catalog read permission |
+| Router → APIM specialist routes | Actual Router application identity and the required application role |
+| APIM → supplier | Shared delegated Studio connection managed by APIM Credential Manager |
+| APIM → logistics | APIM managed-identity Foundry token, not a Studio token |
 
-An operator uses Entra-authenticated public HTTPS to the gateway's restricted publication routes. The gateway runs the publication worker inside its integrated VNet and uses private Foundry, registry, and Blob endpoints. Metadata, manifests, extensions, and images are pinned and bound to operator configuration.
+The certificate stays at the Python requester. APIM does **not** require mTLS.
+Browser user identity is **not** propagated as per-user Studio delegation.
+The delegated Studio token remains inside APIM, not in the browser or Router.
+The shared connection's approved administrator owner is an isolated demo
+exception, not the production recommendation.
 
-Azure Resource Manager is a separate public HTTPS control plane. The reference image builder can schedule a persistent ACR task through ARM. The task's managed identity and explicit trusted-service bypass permit a private registry build without opening anonymous registry access. That bypass is not general public network access and is disabled in the sample foundation by default.
+## Network boundaries
 
-Direct operator access to private endpoints can optionally use an Entra-authenticated point-to-site Azure VPN plus correctly scoped private DNS. This is distinct from the cloud runtime route. The original cloud route was accepted without the client VPN, while direct VPN/DNS acceptance was deferred.
+The selected deployment uses **APIM Developer with External VNet mode**, not
+the Internal mode shown in earlier diagrams. External mode provides a public
+gateway endpoint while allowing VNet backend access. Endpoint reachability is
+not authorization.
 
-The [detailed diagram](architecture.svg) separates the main request path,
-private service access and operator connectivity. The separate token-exchange
-panel is omitted for readability, not removed from the authentication design.
-The editable [overview](architecture-overview.excalidraw) and
-[detailed source](architecture.excalidraw) use unmodified
-[Microsoft product icons](icons/README.md).
+```mermaid
+flowchart TB
+    Local["Local requester / approved workstation"]
+    Teams["Teams service"]
+    Catalog["API Center service"]
+    Studio["Copilot Studio / Entra public SaaS"]
+    subgraph VNet["Existing Azure VNet"]
+        APIM["APIM subnet - External VNet gateway"]
+        Hosted["Dedicated Foundry Hosted runtime subnet"]
+        PE["Private endpoint subnet - service attachments"]
+        APIM -->|Private backend access| PE
+        Hosted -->|Private project and service access| PE
+        Hosted -->|Authenticated specialist routes| APIM
+    end
+    Local -->|HTTPS Bearer| APIM
+    Local -.->|Approved VPN and private DNS for operator access| PE
+    Teams -->|Scoped native Activity platform ingress| Hosted
+    Hosted -->|Authenticated catalog read| Catalog
+    APIM -->|Delegated A2A over HTTPS| Studio
+```
 
-The published source includes only synthetic scenarios and reusable code. Resource names in the drawing are logical labels, not existing deployment identifiers.
+The Teams arrow represents platform dispatch, **not** a public listener added
+to the Hosted subnet. Foundry's general public network access remains disabled.
+Only the scoped native M365 Activity exposure is enabled. Preserve `Shared`
+publication and `BotServiceRbac` together with the runtime's explicit caller
+checks.
+
+Foundry, registry, storage and monitoring are managed services. Their private
+endpoint attachments are in the network, not the entire services. Approved
+private DNS and connectivity are required for direct operator access to the
+private project. Do not open Foundry public access to compensate for a local
+VPN or DNS problem.
+
+Studio, Entra and Teams include public service paths. This is **not** an
+end-to-end private-only solution. Do not infer API Center network isolation
+from its managed-identity authentication.
+
+See Microsoft's [APIM External VNet guidance](https://learn.microsoft.com/azure/api-management/api-management-using-with-vnet),
+[Foundry private connectivity](https://learn.microsoft.com/azure/foundry/how-to/configure-private-link)
+and [native M365 publication with private projects](https://learn.microsoft.com/azure/foundry/agents/how-to/publish-copilot-virtual-network).
+
+## Discovery and specialist routes
+
+Every business request reads API Center using the Router identity. Registered
+questions map to bounded capabilities. Inventory supplies the approved provider,
+route version and source metadata. An unavailable or malformed managed catalog
+fails explicitly, without a cached or static fallback. A valid catalog with
+no compatible capability returns no-match without invoking a specialist.
+
+| Specialist | Capability | APIM route | Source |
+|---|---|---|---|
+| Studio supplier | `supplier-delivery-terms` | `/agents/studio-copilot-harness/versions/1/a2a` | `CONTOSO-MOTORS-SUPPLIER-001`, version 1 |
+| Foundry logistics | `knowledge-knowledge` | `/agents/motors-logistics/versions/1/a2a` | `CONTOSO-MOTORS-LOGISTICS-001`, version 1 |
+
+The route's `versions/1` is the **published route contract**, not the active
+Foundry agent version. At the recorded acceptance, Router version 20 and
+logistics version 6 were selected. Source version 1 is another independent
+identifier. Do not replace a Foundry selector with `1` because it appears in
+an APIM URL.
+
+The supplier reference is part of the Studio configuration. The logistics
+reference is embedded in its prompt instructions, with no tools or RAG.
+Catalog metadata describes sources, but is not evidence of document retrieval.
+No SharePoint retrieval is claimed.
+
+## Limits and response presentation
+
+The current Router enforces a 65-second total budget. Teams accepts plain-text
+questions, rejects unsupported attachments and reserves reply-delivery time
+inside that same budget. The answer limit is 150 whitespace-separated words,
+including headings and inline citations but excluding the separate attribution.
+Oversized answers fail explicitly rather than being truncated.
+
+Teams uses Markdown headings and a compact **References** footer. Each exact
+source/provider/version group lists its title, version and source ID once,
+followed by the cited sections. Inline citations remain intact. Missing or
+inconsistent attribution is an error, not a silently omitted citation.
+
+## Retired and optional components
+
+The demo's legacy Function, its exclusive App Service plan and six exclusive
+identity grants were removed with explicit owner approval. Shared storage,
+APIM, Foundry, API Center, monitoring, DNS and networking were preserved.
+Retired source files do not mean those services still run.
+
+Azure Container Apps is only a possible future host for the same UI/Python
+application. No such host was deployed. It requires separate packaging,
+credentials, ingress, redirect, network and acceptance work.
+
+The older `architecture*.svg`, `.png`, `.excalidraw` assets and their generator
+are **historical Internal-APIM proposals**, not this deployed topology.
+The current diagrams are maintained above and in the README.

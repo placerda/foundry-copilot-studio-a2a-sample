@@ -1,5 +1,13 @@
 # Restricted private publication
 
+> **Legacy reference, not the current Motors deployment path.**
+> The configured demo's Function and exclusive App Service plan were removed.
+> This worker remains in source for reference and contract tests. The statements
+> below describe its original Function-hosted design, not a currently available
+> operator endpoint. Do not recreate the Function to follow this guide.
+> See [current operations](../../docs/operations.md) and
+> [source availability](../../docs/status.md#source-availability).
+
 This package is a publication worker, **not** a general deployment API. It does
 not provision resources, run ACR tasks, change RBAC, open public access, perform
 interactive login, or invoke business agents. The approved Functions Gateway

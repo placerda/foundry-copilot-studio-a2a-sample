@@ -1,31 +1,46 @@
-# Setup guide
+# Setup and troubleshooting
 
-For normal use, follow [Start here](../README.md#start-here).
-Prepare a new workstation using the local setup below.
-This guide's cloud deployment steps describe
-the retained Function reference, not a completed APIM cutover. APIM networking,
-protected OAuth broker/consent, and OBO/SDK feasibility still require validation.
-Do not delete the Function or its private operator duties on the strength of
-the local client or disabled identity choices.
+[Home](../README.md) · [Demo](demo.md) · [Architecture](connectivity.md) ·
+[Operations](operations.md) · [Status](status.md)
 
-This sample preserves a working reference implementation. You must supply your own resource names, identities, permissions, consent, and publication bindings. It does not include existing cloud resources or the private deployment's operating history.
+## Choose the correct starting point
+
+This guide prepares a Windows client for an **existing, authorized deployment**.
+It does not create Azure resources, grant access or publish agents.
+
+| Your starting point | What to do |
+|---|---|
+| Existing configured Motors workstation | Run the launcher checks below, then use the demo |
+| Fresh clone of `main` | Install dependencies if developing, but first read [source availability](status.md#source-availability). The complete Motors runtime and certificate support are not published yet |
+| New Azure environment | Follow the [operator prerequisites](operations.md#prerequisites), not a one-command deployment |
+
+**Do not deploy `contoso/infra/main.bicep` from the published baseline to
+reproduce the current demo.** That baseline still includes the legacy Function.
+The newer, local-only template disables it by default. Documentation updates
+do not change the template or migrate your environment.
 
 ## Local application setup
 
-These steps prepare the Windows chat client. They do not deploy Azure resources.
-The gateway, agents, Entra applications and approved guest access must already
-be configured by an authorized operator.
+You need Windows, PowerShell 5.1 or later, Python 3.12 or later, Node.js/npm,
+an approved Microsoft identity, and operator-provided non-secret bindings.
+Network and DNS access must already be configured for the selected deployment.
+Sign-in alone does not grant application or agent access.
 
-You need PowerShell 5.1 or later, Python 3.12 or later, and Node.js/npm.
-Open PowerShell in the repository root and install the local dependencies:
+On a new development computer, clone the private repository using your approved
+GitHub access:
 
 ```powershell
+git clone https://github.com/placerda/foundry-copilot-studio-a2a-sample.git
+Set-Location foundry-copilot-studio-a2a-sample
 python -m venv .venv-local
 .\.venv-local\Scripts\python.exe -m pip install -r contoso_backend\requirements-local.txt
 npm ci
 ```
 
-Create the ignored configuration files only if they do not already exist:
+These commands install the checked-out reference, not the unpublished Motors
+changes or Azure resources. Do not recreate an existing virtual environment.
+
+Create the ignored configuration files only when missing:
 
 ```powershell
 if (-not (Test-Path frontend\config.js)) {
@@ -36,153 +51,117 @@ if (-not (Test-Path local-demo.config.json)) {
 }
 ```
 
-Fill in the approved **public** settings in both files:
+Use the examples from **your checked-out revision**. Do not copy a newer config
+into the older launcher, which rejects unsupported fields.
 
-| File | What to configure |
+| File / setting | Meaning |
 |---|---|
-| `frontend\config.js` | Tenant, SPA client and API scope. Keep `API_URL: "/api/chat"`, `REDIRECT_URI: "http://localhost:8000/"` and `CONTOSO_ENABLED: true` |
-| `local-demo.config.json` | Backend tenant, API audience, approved user's object ID and gateway/requester bindings from the example |
+| `frontend\config.js` | Public tenant, SPA application ID and delegated API scope |
+| Frontend `API_URL` | Keep `/api/chat` for same-origin requests |
+| Frontend `REDIRECT_URI` | Register and use exactly `http://localhost:8000/` |
+| Frontend `CONTOSO_ENABLED` | Set `true` for the collaboration route |
+| Backend `TENANT_ID`, `API_AUDIENCE` | Tenant and audience of the browser-facing API |
+| Backend `ALLOWED_USER_OID` | Exact approved user's object ID in the application tenant |
+| `CONTOSO_ENTRA_TENANT_ID` | Tenant issuing the requester's APIM token |
+| `CONTOSO_GATEWAY_API_CLIENT_ID` | APIM API application's ID, not the Foundry project identity |
+| `CONTOSO_REQUESTER_CLIENT_ID` | Separate confidential requester application's ID |
+| `CONTOSO_GATEWAY_URL` | Approved APIM URL ending in `/api/a2a` |
+| `CONTOSO_APIM_HOST` | Exact approved `<name>.azure-api.net` host |
 
-The frontend tenant and API scope must match the backend tenant and audience.
-`ALLOWED_USER_OID` is the approved user's object ID **in the application tenant**,
-not their home-directory ID. Do not put passwords, client secrets or tokens in
-either file, or add credential-source overrides.
+The frontend tenant and scope must match the backend tenant and API audience.
+Do not put passwords, private keys, secrets or tokens in these files.
+An approved administrator used for this isolated demo is an exception, not a
+production access model.
 
-The requester credential must already be provisioned in the current Windows
-user's protected store under `ContosoAgentDemo:requester:<client-id>`, matching
-the requester application. The launcher reads that exact credential without
-printing or copying it. If missing, an authorized operator must complete the
-credential setup. Do not export cloud secrets into this repository.
+### Requester credential: published reference versus current demo
 
-Build the frontend and check the prerequisites:
+The published launcher uses a client secret already provisioned in Windows
+Credential Manager, under `ContosoAgentDemo:requester:<client-id>`. Have the
+authorized operator provision it through an approved secure process. Never paste
+the value into a terminal command, config file or Git.
+
+The current Motors workstation instead uses the newer **certificate requester**:
+
+| Local-only setting | Value |
+|---|---|
+| `CONTOSO_REQUESTER_CREDENTIAL_SOURCE` | `windows-certificate` |
+| `CONTOSO_REQUESTER_CERTIFICATE_PATH` | Absolute path to the public PEM |
+
+This mode requires the unpublished `contoso_backend.requester_certificate`
+module and updated launcher/backend. Do not add these fields to a fresh clone
+until that implementation is available.
+
+The private key is protected in the current Windows user's Credential Manager,
+not stored in Git or the public PEM. Only the public certificate is registered
+on the requester application in Entra. The requester signs a short-lived client
+assertion to obtain an access token. **APIM receives a Bearer token, not a client
+certificate. This is not mTLS.**
+
+The certificate mode checks validity and key matching and does not silently
+fall back to the old secret. Rotate by registering the new public certificate
+alongside the old one, accepting a real token request and APIM invocation, then
+retiring the old credential explicitly. Preserve a reviewed return path.
+See [Microsoft's certificate credential contract](https://learn.microsoft.com/entra/identity-platform/certificate-credentials).
+
+### Build and start
+
+Once the configuration and credential match your revision:
 
 ```powershell
 npm run build
 .\start-local.ps1 -CheckOnly
+.\start-local.ps1
 ```
 
-After the check succeeds, run `.\start-local.ps1` and open
-**http://localhost:8000/**. Keep the terminal open while using the chat.
-The launcher prefers `.venv-local`, then `.venv`. It does not install
-dependencies, make cloud changes or replace an existing port 8000 listener.
+Open **http://localhost:8000/** and keep the terminal running. The launcher
+prefers `.venv-local`, then `.venv`. It does not install dependencies, deploy
+services or replace an occupied port. Use Ctrl+C to stop only your server.
+
+Use `localhost` consistently. Substituting `127.0.0.1` can fail Host, Origin
+or redirect validation even though both addresses are loopback.
+
+The server verifies signature, issuer, tenant, audience, expiry, delegated
+scope and the approved user before calling APIM. It acquires its own requester
+token rather than forwarding the browser token downstream. Do not bind this
+Windows launcher to a LAN interface or treat it as a cloud hosting solution.
 
 ## Local troubleshooting
 
-| Symptom | Action |
+| Symptom | Check / action |
 |---|---|
-| Browser cannot connect to localhost | Start `.\start-local.ps1` and wait for its startup message |
-| Port 8000 is already in use | Use the existing application. Do not stop an unrelated process |
-| Frontend build is missing | Complete `frontend\config.js`, then run `npm run build` |
-| Public configuration is invalid | Check the example's allowed fields and tenant/audience bindings |
-| Protected credential is missing or mismatched | Have the authorized operator provision the correct Windows requester credential. There is no fallback identity |
-| Signed in, but chat says the user has no access | The signed-in user's tenant object ID must match `ALLOWED_USER_OID`, and their access token must include `access_as_user`. Verify approved bindings without broadening access |
-| Microsoft sign-in fails | Use the approved account and check the exact localhost redirect and delegated API scope |
-| A downstream request fails | Use its request ID and sanitized status for diagnosis. Do not log tokens or prompts |
+| Browser cannot connect | Start the launcher and check its startup output |
+| Port 8000 is occupied | Use the known existing app or identify its owner. Do not kill an unrelated process |
+| `invalid_host` or redirect mismatch | Use `http://localhost:8000/` and matching configured redirect |
+| Missing frontend build | Complete `frontend\config.js`, then run `npm run build` |
+| Unsupported configuration field | Check revision compatibility, especially certificate settings |
+| Missing or mismatched credential | Ask the authorized operator to provision the matching protected credential. Do not add fallback identities |
+| Signed in but access denied | Verify the application-tenant object ID, API audience and `access_as_user` scope |
+| Sign-in popup blocked | Allow the expected Microsoft sign-in interaction in that browser. A different browser's login does not establish this browser's session |
+| Question remains in the draft | It has not been sent. A selected suggestion or enabled Send button is not delivery evidence |
+| No matching capability | Use an exact registered question from the [demo guide](demo.md#registered-questions) |
+| Downstream failure | Record sanitized status and request ID. Check [operations troubleshooting](operations.md#troubleshooting) without logging credentials or prompts |
 
-The local server validates the token's signature, issuer, tenant, audience,
-expiry, delegated scope and approved user before calling the gateway.
-It listens only on loopback. Do not bind this Windows launcher to a LAN
-interface or treat it as a Container Apps deployment.
+After an authorized config change, restart only the server you own.
+Do not reset the shared connection or broaden allowlists as a troubleshooting
+shortcut.
 
-## Cloud prerequisites (operators)
+## Teams setup boundary
 
-Use Python 3.12, Node.js, Azure CLI, Azure Developer CLI, Docker-compatible image tooling, and access to an Azure subscription and Entra tenant. The Hosted manifest records the required `azd` and agent-extension versions in [`contoso/azure.yaml`](../contoso/azure.yaml).
+Using the published Contoso Motors app does not require the local Python
+server. An operator must already have published the native Foundry Activity
+endpoint and Teams application and granted the intended access.
+Follow [Teams usage](demo.md#use-microsoft-teams) and
+[Teams admission](operations.md#teams-admission-and-delivery).
 
-Confirm that Microsoft Foundry Hosted agents and Azure Functions Flex Consumption are available in your selected Region. The checked infrastructure reference is restricted to `eastus2`. Check preview API support, quotas, and service cost before deployment.
-
-You also need a published Copilot Studio agent with its native A2A endpoint enabled, a Power Platform environment, permission to configure Entra applications and consent, and permission to provision resources and assign service roles.
-
-## 1. Establish identity boundaries
-
-Configure an Entra API application for the gateway. Configure exact tenant, audience, client, principal, and application-role allowlists. The gateway combines App Service authentication with handler-level authorization.
-
-Use a separate confidential requester identity for an external backend. Grant only the gateway invocation role it needs. The gateway's managed identity calls private Foundry. The Hosted agent's actual managed identity is separately authorized to use the connection-token broker. Discover the real agent identity after publication rather than guessing it from the project identity.
-
-Configure the broker's OAuth application and exact gateway callback URL. Complete delegated consent for the approved guest using `MCS.InvokeAsA2A`. The broker stores protected token state in private Blob Storage. Keep its encryption key and confidential-client credential in protected service settings. The callback has its own state and identity checks.
-
-Do not place passwords, private keys, access tokens, refresh tokens, or client secrets in source files, CLI arguments, diagrams, or deployment outputs.
-
-## 2. Provision the private Azure foundation
-
-Review [`main.bicep`](../contoso/infra/main.bicep) and its network, storage, monitoring, Foundry, and gateway modules. Copy [`main.bicepparam.example`](../contoso/infra/main.bicepparam.example) to a local `main.bicepparam`, replace the synthetic IDs and suffix, and target a dedicated resource group.
-
-Compile and review before applying:
-
-```powershell
-az bicep build --file contoso\infra\main.bicep
-az deployment group what-if --resource-group <resource-group> --parameters contoso\infra\main.bicepparam
-```
-
-Resource creation is a separate intentional step:
-
-```powershell
-az deployment group create --resource-group <resource-group> --parameters contoso\infra\main.bicepparam
-```
-
-The foundation intentionally creates the gateway stopped. Authentication, authorization, package deployment, and explicit runtime bindings must be verified before enabling it.
-
-The template does not publish an agent, upload sources, configure complete OAuth/runtime bindings, or provision a model by default. Private Link is used for Foundry, two Blob Storage accounts, ACR, and Azure Monitor. Queue and Table endpoints are opt-in and not needed for the demonstrated HTTP-only route.
-
-The optional [`vpn.bicep`](../contoso/infra/vpn.bicep) is for direct operator access only. It is not included in the resource-group foundation, and no VPN is required for external-client runtime requests. Do not install DNS helpers or change workstation routes to run the cloud path.
-
-## 3. Build and publish the Hosted runtime
-
-Build the reviewed [`contoso/Dockerfile`](../contoso/Dockerfile) and pin the resulting image digest. The reference provides [`create_image.py`](../contoso/ops/create_image.py) for a persistent managed-identity ACR task. A private registry task needs its own narrowly scoped push authorization and an explicitly reviewed trusted-service network bypass. The foundation leaves that bypass disabled by default.
-
-Create the managed-identity registry connection using [`registry-connection.bicep`](../contoso/infra/registry-connection.bicep). Registry connection discovery and permission to pull an image are separate concerns. Assign `AcrPull` to the actual Hosted agent identity.
-
-The retained publication worker is deliberately restricted to the reviewed multi-service manifest. Do not remove services or change its hash without updating and reviewing the publication contract. Other retained agents can stay in probe-only mode. The accepted business target is `contoso-foundry-agent` with:
-
-```text
-CONTOSO_RUNTIME_ROLE=router
-CONTOSO_ROUTER_SCOPE=studio-harness
-```
-
-Supply all validated tenant, gateway, Studio endpoint, source, identity, and image bindings. [`contoso/publication/README.md`](../contoso/publication/README.md) describes the worker's API, approved authorization gate, pinned CLI/extension requirements, and mandatory `OperatorConfig`.
-
-Use [`stage_gateway.py`](../contoso/ops/stage_gateway.py) and the private publication worker inside the VNet to stage the reviewed runtime and synthetic sources. The operator can reach the authenticated public gateway, while its managed identity performs the private data-plane operations. Build, publication, consent, RBAC, and activation are separate operations, not implicit effects of deploying Bicep.
-
-[`configure_gateway.py`](../contoso/ops/configure_gateway.py) is an advanced post-publication reference that expects records and publication bindings to already exist. It is not a bootstrap script. Review its exact grants, settings, and default dry run before any apply.
-
-## 4. Add an external client, if needed
-
-A client with approved gateway credentials can call the authenticated bridge directly. The reference [`contoso_backend/a2a_requester.py`](../contoso_backend/a2a_requester.py) contains the A2A requester and response parsing.
-
-Use the real loopback Python HTTP backend in
-[`contoso_backend/local_server.py`](../contoso_backend/local_server.py).
-It verifies an Entra RS256 bearer token, exact tenant, API audience,
-delegated scope, and allowed guest OID before calling the configured gateway.
-It is not an anonymous chat API or a locally hosted reasoning agent.
-The cloud gateway uses `CONTOSO_REQUESTER_CLIENT_ID` and
-`CONTOSO_REQUESTER_OID` for the confidential requester's application and
-principal IDs. Supply explicit bindings for a fresh deployment. This sample
-does not update existing identities or deployed configuration.
-
-For the browser, copy [`frontend/config.example.js`](../frontend/config.example.js) to the ignored `frontend/config.js` and fill in your own non-secret SPA settings. Set `CONTOSO_ENABLED` to `true` to show the A2A integration route. Register the exact redirect URI and delegated chat API scope. MSAL tokens stay in memory. The backend exchanges its own requester credential for a gateway token rather than forwarding the browser token across trust boundaries.
-
-Follow [Local application setup](#local-application-setup) to prepare and start
-the Windows client.
-
-## 5. Validate the intended behavior
-
-Run the [development checks](#development-checks) first. Unit tests use synthetic identities and do not replace real service acceptance.
-
-For **Supplier–Buyer Agent Collaboration**, use all four registered scenarios in [`contoso-demo/scenarios.json`](../contoso-demo/scenarios.json). Evaluate the proposed 300-unit Friday / 200-unit Monday split against the buyer's 500-unit Friday request; ask for the acceptance conditions and evidence limits; ask for the unsupported exact penalty; and request approval, which must return no-match with no provider citation.
-
-The active source is [`supplier-delivery-terms.md`](../contoso-demo/knowledge/supplier-delivery-terms.md), `CONTOSO-DEMO-SUPPLIER-001`, version 1. Configure the same source and prompts for both Studio variants. Verify source/version attribution, written-acceptance conditions, and refusal to invent penalties or claim approval. Browser suggestions must match configured questions exactly. The retained reusable-container knowledge document is a deferred B2B adapter reference, not an active scenario.
-
-Only a genuinely signed-in approved guest calling actual deployed services can establish live acceptance. Local tests use synthetic responses and prove contracts, not service outcomes. Nothing in this guide records a purchase-order approval or authorizes VPN, DNS, or cloud changes.
-
-If port 8000 is occupied during local browser tests, select an unused port without stopping another service: `$env:CONTOSO_TEST_PORT = "8019"; npm run test:ui`. The synthetic test server and browser runner use the same port.
-
-Upstream Studio calls have bounded timeouts. A historical read-timeout was observed in the original deployment, and this sample does not claim to eliminate it. Inspect safe request IDs and status codes rather than logging tokens or prompts.
+Do not deploy another bot, Function or App Service just to use this entry point.
+Teams installation, platform authorization and runtime caller admission are
+separate checks.
 
 ## Development checks
 
-These commands run tests and build the frontend. They do **not** start the
-application. For normal use, run `.\start-local.ps1`.
-
-Use Python 3.12 and Node.js:
+These commands exist in the published reference. Run them from the repository
+root with your revision's dependencies. Install only into a new or incomplete
+development environment:
 
 ```powershell
 python -m venv .venv
@@ -194,11 +173,27 @@ npm run test:ui
 npm run build
 ```
 
-To regenerate SVG, PNG and editable Excalidraw diagrams:
+UI tests need the Playwright browser required by the installed version. If it
+is missing, install it with `npx playwright install chromium`.
+If the test port is occupied, set an unused port without stopping another app:
 
 ```powershell
-node tools\render-diagrams.mjs --png
+$env:CONTOSO_TEST_PORT = "8019"
+npm run test:ui
 ```
 
-PNG rendering requires an installed Playwright Chromium browser.
-See [product icon usage](icons/README.md).
+The current Motors working copy also has focused tests for catalog discovery,
+Teams, certificate authentication and guarded SDK operations. Those additions
+are not all on `main`. Synthetic tests prove contracts, not live service
+acceptance. Do not describe an old suite as a test of unpublished changes.
+
+## Diagrams and historical tooling
+
+The current diagrams are the Mermaid blocks in [README](../README.md#how-the-current-demo-works)
+and [connectivity](connectivity.md). Edit those with the corresponding prose.
+
+`tools\render-diagrams.mjs` and the older `docs/architecture*.svg`, `.png`
+and `.excalidraw` assets describe an earlier Internal-APIM target. They are
+retained historical material, not the current deployed External-APIM topology.
+Running the old renderer does not regenerate the current diagrams.
+See [product icon attribution](icons/README.md) when reusing those assets.
