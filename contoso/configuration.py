@@ -42,9 +42,11 @@ def endpoint(env: Mapping[str, str], name: str, suffix: str | tuple[str, ...]) -
     return value
 
 
-def platform_callers(env: Mapping[str, str]) -> frozenset[str]:
+def platform_callers(
+    env: Mapping[str, str], *, setting: str = "CONTOSO_PLATFORM_CALLER_IDS",
+) -> frozenset[str]:
     try:
-        callers = json.loads(required(env, "CONTOSO_PLATFORM_CALLER_IDS"))
+        callers = json.loads(required(env, setting))
     except json.JSONDecodeError:
         raise CatalogError("Platform caller grants must be a JSON list") from None
     if (not isinstance(callers, list) or not 1 <= len(callers) <= 10
@@ -215,8 +217,9 @@ class RouterSettings:
         )
 
 
-def demo_router(*, capability: Capability | None = None) -> DemoQuestionRouter:
-    path = Path(__file__).resolve().parents[1] / "contoso-demo" / "scenarios.json"
+def demo_router(*, capability: Capability | None = None, motors: bool = False) -> DemoQuestionRouter:
+    filename = "motors-scenarios.json" if motors else "scenarios.json"
+    path = Path(__file__).resolve().parents[1] / "contoso-demo" / filename
     with path.open(encoding="utf-8") as source:
         dataset = json.load(source)
     return DemoQuestionRouter({

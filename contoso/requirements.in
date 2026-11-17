@@ -1,4 +1,5 @@
 azure-ai-agentserver-responses==2.4.0
+azure-ai-agentserver-activity==1.0.0b4
 azure-ai-agentserver-a2a @ https://github.com/Azure/azure-sdk-for-python/archive/59d5588130b7b7bffa4db0deda290c0d22369c6d.zip#subdirectory=sdk/agentserver/azure-ai-agentserver-a2a
 azure-ai-agentserver-core @ https://github.com/Azure/azure-sdk-for-python/archive/59d5588130b7b7bffa4db0deda290c0d22369c6d.zip#subdirectory=sdk/agentserver/azure-ai-agentserver-core
 a2a-sdk[http-server]==1.2.3
@@ -9,6 +10,7 @@ azure-storage-blob>=12.27,<13
 cryptography>=46,<47
 langgraph>=1.0,<2
 microsoft-agents-copilotstudio-client==1.9.0
+microsoft-agents-authentication-msal==1.9.0
 msal==1.35.1
 PyJWT[crypto]>=2.10,<3
 requests>=2.34.2,<3

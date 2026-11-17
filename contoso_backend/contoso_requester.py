@@ -91,6 +91,8 @@ class Requester:
         self.settings = settings
         if gateway_endpoint(settings.gateway_url, endpoint_path, settings.approved_apim_host) != settings.gateway_url:
             raise ValueError("Invalid CONTOSO endpoint")
+        if (settings.requester_client_secret is None) == (settings.requester_certificate is None):
+            raise ValueError("Exactly one requester credential is required")
         self.session_factory = session_factory
         self._lock = threading.Lock()
         self._token = None
@@ -133,17 +135,36 @@ class Requester:
     def _token_for(self, session, deadline):
         with self._lock:
             now = time.monotonic()
+            certificate = self.settings.requester_certificate
+            if certificate is not None:
+                try:
+                    certificate.require_valid()
+                except ValueError:
+                    self._token, self._expires = None, 0.0
+                    raise unavailable() from None
             if self._token is not None and now < self._expires:
                 return self._token
             self._token, self._expires = None, 0.0
+            data = {"grant_type": "client_credentials",
+                    "client_id": self.settings.requester_client_id,
+                    "scope": f"api://{self.settings.gateway_api_client_id}/.default"}
+            if certificate is not None:
+                try:
+                    data.update(
+                        client_assertion_type="urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
+                        client_assertion=certificate.assertion(
+                            self.settings.requester_client_id, self.settings.tenant_id,
+                        ),
+                    )
+                except ValueError:
+                    raise unavailable() from None
+            else:
+                data["client_secret"] = self.settings.requester_client_secret
             value = self._post(
                 session,
                 f"https://login.microsoftonline.com/{self.settings.tenant_id}/oauth2/v2.0/token",
                 min(deadline, now + TOKEN_TIMEOUT_SECONDS),
-                data={"grant_type": "client_credentials",
-                      "client_id": self.settings.requester_client_id,
-                      "client_secret": self.settings.requester_client_secret,
-                      "scope": f"api://{self.settings.gateway_api_client_id}/.default"},
+                data=data,
                 token_request=True,
             )
             token = value.get("access_token") if isinstance(value, dict) else None

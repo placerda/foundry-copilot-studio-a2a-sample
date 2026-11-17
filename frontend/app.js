@@ -1,13 +1,13 @@
 import { Auth, signInErrorMessage } from "./auth.js";
 import { Conversation } from "./conversation.js";
 import { renderMarkdown } from "./markdown.js";
-import { validateCapabilities, selectedMode, validIdentity } from "./identity.js";
+import { validateCapabilities, selectedMode, validIdentity, SHARED_MODE } from "./identity.js";
 import { makeContosoPayload, validContoso, readResponse, CONTOSO_TIMEOUT_MS,
   NATIVE_CONTOSO_OPTIONS } from "./contoso.js";
 
 const ui = Object.fromEntries(["error", "login", "logout", "reset", "send", "draft",
   "messages", "processing", "auth-status", "chat-form",
-  "empty-state", "start-hint", "identity-mode", "identity-reason",
+  "empty-state", "start-hint", "identity-reason",
   "identity-callers"].map(id => [id, document.getElementById(id)]));
 let auth;
 let config;
@@ -30,8 +30,7 @@ class RequestFailure extends Error {}
 
 function render() {
   const contosoEnabled = config?.CONTOSO_ENABLED === true;
-  const identityReady = identityReadiness?.modes[ui["identity-mode"].value]?.enabled === true;
-  ui["identity-mode"].disabled = !identityReadiness || pending || signingOut;
+  const identityReady = identityReadiness?.modes[SHARED_MODE]?.enabled === true;
   ui.login.hidden = !!auth?.account;
   ui.logout.hidden = !auth?.account;
   ui.reset.hidden = !auth?.account;
@@ -142,26 +141,31 @@ export function validResponse(value, options = null, mode = "shared-delegated") 
     && (!options || validContoso(value.contoso, options));
 }
 
+let startupStage = "configuration";
 try {
   ({ default: config } = await import("./config.js"));
   auth = new Auth(config);
+  startupStage = "authentication";
   await auth.initialize();
+  startupStage = "readiness";
   const readinessResponse = await fetch("/api/capabilities", {
     credentials: "omit", cache: "no-store", signal: AbortSignal.timeout(5000),
   });
   if (!readinessResponse.ok) throw new Error("Identity readiness unavailable.");
   identityReadiness = validateCapabilities(await readResponse(readinessResponse));
-  for (const option of ui["identity-mode"].options) {
-    option.disabled = identityReadiness.modes[option.value]?.enabled !== true;
-  }
-  ui["identity-reason"].textContent = "Shared connection selected.";
+  ui["identity-reason"].textContent = identityReadiness.modes[SHARED_MODE].reason;
   if (config.CONTOSO_ENABLED !== true) {
     ui.error.textContent = "Agent network is not configured. Enable CONTOSO_ENABLED only after configuring the A2A connection.";
   }
   render();
 } catch {
   auth = null;
-  ui.error.textContent = "Invalid configuration. Complete frontend/config.js before using the app.";
+  ui["identity-reason"].textContent = "Availability could not be verified.";
+  ui.error.textContent = startupStage === "configuration"
+    ? "Invalid configuration. Complete frontend/config.js before using the app."
+    : startupStage === "authentication"
+    ? "Microsoft sign-in could not initialize. Reload this page in a supported browser."
+    : "Identity readiness is unavailable or invalid. Check the local Python server and reload.";
   render();
 }
 
@@ -188,12 +192,12 @@ ui["chat-form"].addEventListener("submit", async event => {
   let mode;
   const options = NATIVE_CONTOSO_OPTIONS;
   try {
-    mode = selectedMode(ui["identity-mode"].value, identityReadiness);
+    mode = selectedMode(SHARED_MODE, identityReadiness);
     payload = makeContosoPayload(conversation.confirmedPairs, draft, options, mode);
   } catch {
-    ui.error.textContent = identityReadiness?.modes[ui["identity-mode"].value]?.enabled === true
+    ui.error.textContent = identityReadiness?.modes[SHARED_MODE]?.enabled === true
       ? "Enter a valid question of up to 2,000 characters within the byte limit."
-      : "This scenario is unavailable. Select Shared delegated connection.";
+      : "The shared delegated connection is unavailable. No request was sent.";
     return;
   }
   pending = true;
@@ -279,15 +283,6 @@ function resetConversation() {
 }
 
 ui.reset.addEventListener("click", () => resetConversation());
-ui["identity-mode"].addEventListener("change", () => {
-  resetConversation();
-  const entry = identityReadiness?.modes[ui["identity-mode"].value];
-  ui["identity-reason"].textContent = entry?.enabled === true ? "Shared connection selected." : "Not configured.";
-  if (entry?.enabled !== true) {
-    ui.error.textContent = "This scenario is unavailable. Select Shared delegated connection.";
-  }
-  render();
-});
 for (const button of document.querySelectorAll("[data-prompt]")) {
   button.addEventListener("click", () => {
     if (ui.send.disabled) return;

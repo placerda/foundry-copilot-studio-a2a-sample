@@ -61,7 +61,7 @@ def test_malformed_configuration_has_sanitized_error(workspace):
 
 
 @pytest.mark.parametrize("field", [
-    "CONTOSO_REQUESTER_CLIENT_SECRET", "CONTOSO_REQUESTER_CREDENTIAL_SOURCE",
+    "CONTOSO_REQUESTER_CLIENT_SECRET", "CONTOSO_REQUESTER_PRIVATE_KEY",
     "PYTHONPATH", "tenant_id",
 ])
 def test_unsupported_fields_are_rejected_without_printing_values(workspace, field):
@@ -86,3 +86,48 @@ def test_required_configuration_is_not_inherited_silently(workspace):
     result = run_launcher(workspace)
     assert result.returncode != 0
     assert "Missing configuration field: TENANT_ID" in result.stderr
+
+
+def requester_config(**changes):
+    return {
+        "TENANT_ID": "11111111-1111-1111-1111-111111111111",
+        "API_AUDIENCE": "22222222-2222-2222-2222-222222222222",
+        "ALLOWED_USER_OID": "33333333-3333-3333-3333-333333333333",
+        "CONTOSO_ENTRA_TENANT_ID": "44444444-4444-4444-4444-444444444444",
+        "CONTOSO_GATEWAY_API_CLIENT_ID": "55555555-5555-5555-5555-555555555555",
+        "CONTOSO_REQUESTER_CLIENT_ID": "66666666-6666-6666-6666-666666666666",
+        "CONTOSO_GATEWAY_URL": "https://sample-apim.azure-api.net/api/a2a",
+        **changes,
+    }
+
+
+@pytest.mark.parametrize("source", ["environment", "automatic", "WINDOWS", "WINDOWS-CERTIFICATE"])
+def test_launcher_rejects_unprotected_or_unknown_credential_modes(workspace, source):
+    write_config(workspace, requester_config(CONTOSO_REQUESTER_CREDENTIAL_SOURCE=source))
+    result = run_launcher(workspace)
+    assert result.returncode != 0
+    assert "supports only windows or windows-certificate" in result.stderr
+
+
+def test_launcher_requires_certificate_path_for_certificate_mode(workspace):
+    write_config(workspace, requester_config(CONTOSO_REQUESTER_CREDENTIAL_SOURCE="windows-certificate"))
+    result = run_launcher(workspace)
+    assert result.returncode != 0
+    assert "Missing configuration field: CONTOSO_REQUESTER_CERTIFICATE_PATH" in result.stderr
+
+
+def test_required_public_settings_are_checked_before_certificate_options(workspace):
+    write_config(workspace, {
+        "TENANT_ID": "11111111-1111-1111-1111-111111111111",
+        "CONTOSO_REQUESTER_CREDENTIAL_SOURCE": "windows-certificate",
+    })
+    result = run_launcher(workspace)
+    assert result.returncode != 0
+    assert "Missing configuration field: API_AUDIENCE" in result.stderr
+
+
+def test_launcher_does_not_allow_certificate_path_with_legacy_secret(workspace):
+    write_config(workspace, requester_config(CONTOSO_REQUESTER_CERTIFICATE_PATH="C:\\public.pem"))
+    result = run_launcher(workspace)
+    assert result.returncode != 0
+    assert "public certificate path requires windows-certificate" in result.stderr

@@ -26,6 +26,28 @@ def build_host(env, credential):
         from contoso.identity_probe import build_probe_host
 
         return build_probe_host()
+    if role == "catalog-access-probe":
+        from contoso.api_center import APICenterClient
+        from contoso.identity_probe import build_catalog_probe_host
+
+        return build_catalog_probe_host(
+            APICenterClient(required(env, "CONTOSO_APICENTER_ENDPOINT"), credential),
+            allowed_callers=platform_callers(env),
+        )
+    if role == "apim-access-probe":
+        from contoso.configuration import identifier
+        from contoso.identity_probe import build_apim_probe_host
+        from contoso.router.discovery import APIMRoutePolicy
+
+        return build_apim_probe_host(
+            credential,
+            APIMRoutePolicy(
+                required(env, "CONTOSO_APIM_A2A_BASE_URL"),
+                identifier(env, "CONTOSO_ENTRA_TENANT_ID"),
+                identifier(env, "CONTOSO_ENTRA_API_CLIENT_ID"),
+            ),
+            allowed_callers=platform_callers(env),
+        )
     if role == "identity-link-probe":
         from contoso.identity_link import IdentityLinkProbe
 
@@ -62,6 +84,36 @@ def build_host(env, credential):
     if role != "router":
         raise CatalogError("The configured Hosted runtime role is unsupported")
     scope = env.get("CONTOSO_ROUTER_SCOPE", "catalog")
+    if scope == "api-center":
+        from contoso.api_center import APICenterClient
+        from contoso.configuration import identifier
+        from contoso.router.discovery import APIMRoutePolicy, DiscoveredRouterRuntime, REQUEST_BUDGET
+
+        policy = APIMRoutePolicy(
+            required(env, "CONTOSO_APIM_A2A_BASE_URL"),
+            identifier(env, "CONTOSO_ENTRA_TENANT_ID"),
+            identifier(env, "CONTOSO_ENTRA_API_CLIENT_ID"),
+        )
+        client = APICenterClient(required(env, "CONTOSO_APICENTER_ENDPOINT"), credential)
+        runtime = DiscoveredRouterRuntime(
+            client,
+            policy, platform_callers(env), demo_router(motors=True), credential,
+        )
+        teams_router = None
+        if "CONTOSO_TEAMS_PLATFORM_CALLER_IDS" in env:
+            teams_runtime = DiscoveredRouterRuntime(
+                client, policy,
+                platform_callers(env, setting="CONTOSO_TEAMS_PLATFORM_CALLER_IDS"),
+                demo_router(motors=True), credential,
+            )
+            teams_router = HostedRouter(
+                teams_runtime, fixed_variant=STUDIOVariant.COPILOT_HARNESS,
+                overall_timeout=REQUEST_BUDGET,
+            )
+        return HostedRouter(
+            runtime, fixed_variant=STUDIOVariant.COPILOT_HARNESS,
+            overall_timeout=REQUEST_BUDGET,
+        ).build_host(teams_router=teams_router)
     if scope == "studio-harness":
         harness = HarnessRouterSettings.from_environment(env)
         tokens = ProviderTokens(

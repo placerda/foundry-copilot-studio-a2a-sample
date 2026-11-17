@@ -4,6 +4,7 @@ import asyncio
 from collections.abc import Callable, Mapping
 import json
 import re
+import threading
 import time
 from urllib.parse import urlsplit
 from uuid import uuid4
@@ -78,6 +79,7 @@ class _A2AHTTP:
         max_response_bytes: int = 1_048_576,
         session_factory: Callable[[], requests.Session] = requests.Session,
         platform_headers_factory: Callable[[], Mapping[str, str]] | None = None,
+        worker_slot: threading.Semaphore | None = None,
     ):
         validate_limits(connect_timeout, read_timeout, overall_timeout,
                         max_response_bytes=max_response_bytes)
@@ -85,6 +87,8 @@ class _A2AHTTP:
             raise ConfigurationError("A2A session factory is invalid")
         if platform_headers_factory is not None and not callable(platform_headers_factory):
             raise ConfigurationError("Platform headers factory is invalid")
+        if worker_slot is not None and not isinstance(worker_slot, threading.Semaphore):
+            raise ConfigurationError("A2A worker admission slot is invalid")
         self.approved_origins = validate_origins(approved_origins)
         self.connect_timeout = connect_timeout
         self.read_timeout = read_timeout
@@ -92,6 +96,7 @@ class _A2AHTTP:
         self.max_response_bytes = max_response_bytes
         self.session_factory = session_factory
         self.platform_headers_factory = platform_headers_factory
+        self.worker_slot = worker_slot
 
     async def _request(self, endpoint: str, text: str, token: str) -> tuple[str, str | None]:
         validate_endpoint(endpoint, self.approved_origins)
@@ -99,6 +104,15 @@ class _A2AHTTP:
         try:
             async with asyncio.timeout(self.overall_timeout):
                 platform_headers = self._platform_headers()
+                if self.worker_slot is not None:
+                    from contoso.bounded import run_bounded_sync
+
+                    return await run_bounded_sync(
+                        self.worker_slot,
+                        lambda: self._send(
+                            endpoint, text, token, platform_headers=platform_headers,
+                        ),
+                    )
                 return await asyncio.to_thread(
                     self._send, endpoint, text, token,
                     platform_headers=platform_headers,
@@ -169,12 +183,14 @@ class A2ATransport(_A2AHTTP):
         overall_timeout: float = 60, max_response_bytes: int = 1_048_576,
         session_factory: Callable[[], requests.Session] = requests.Session,
         platform_headers_factory: Callable[[], Mapping[str, str]] | None = None,
+        worker_slot: threading.Semaphore | None = None,
     ):
         super().__init__(
             approved_origins=approved_origins, connect_timeout=connect_timeout,
             read_timeout=read_timeout, overall_timeout=overall_timeout,
             max_response_bytes=max_response_bytes, session_factory=session_factory,
             platform_headers_factory=platform_headers_factory,
+            worker_slot=worker_slot,
         )
         validate_endpoint(endpoint, self.approved_origins)
         self.endpoint = endpoint

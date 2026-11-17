@@ -1,8 +1,9 @@
 export const MODES = ["user-delegation", "service-to-service", "shared-delegated"];
+export const SHARED_MODE = "shared-delegated";
 
 export function validateCapabilities(value) {
   if (!value || Object.keys(value).sort().join() !== "default,modes"
-      || value.default !== "shared-delegated"
+      || value.default !== SHARED_MODE
       || !value.modes || Object.keys(value.modes).sort().join() !== [...MODES].sort().join()) {
     throw new Error("Invalid identity readiness.");
   }
@@ -22,7 +23,7 @@ export function validateCapabilities(value) {
 }
 
 export function selectedMode(mode, capabilities) {
-  if (!MODES.includes(mode) || capabilities?.modes[mode]?.enabled !== true) {
+  if (mode !== SHARED_MODE || capabilities?.modes[mode]?.enabled !== true) {
     throw new Error("This identity scenario is unavailable. No fallback was attempted.");
   }
   return mode;

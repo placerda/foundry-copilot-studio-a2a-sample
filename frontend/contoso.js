@@ -1,5 +1,5 @@
 import { makePayload, validText } from "./conversation.js";
-import { MODES } from "./identity.js";
+import { SHARED_MODE } from "./identity.js";
 
 export const LEGACY_TIMEOUT_MS = 35000;
 export const CONTOSO_TIMEOUT_MS = 100000;
@@ -31,7 +31,7 @@ export function makeContosoPayload(pairs, draft, options, mode = null) {
   if (!validOptions(options) || !validText(draft) || [...draft].length > 2000) {
     throw new Error("Invalid agent question or selection.");
   }
-  if (mode !== null && !MODES.includes(mode)) throw new Error("Invalid identity mode.");
+  if (mode !== null && mode !== SHARED_MODE) throw new Error("Invalid identity mode.");
   const extra = { contoso_options: { ...options }, ...(mode === null ? {} : { identity_mode: mode }) };
   const overhead = new TextEncoder().encode(JSON.stringify(extra)).length - 1;
   return { ...makePayload(pairs, draft, 10, 32768 - overhead), ...extra };

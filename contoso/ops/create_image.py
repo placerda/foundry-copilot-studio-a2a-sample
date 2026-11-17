@@ -27,11 +27,12 @@ def source_archive(root: Path, *, sdk_proof: bool = False) -> bytes:
         root / "contoso" / "Dockerfile",
         root / "contoso" / "requirements.txt",
         root / "contoso-demo" / "scenarios.json",
+        root / "contoso-demo" / "motors-scenarios.json",
     ]
     paths.extend(root / "contoso_backend" / name for name in ("__init__.py", "auth.py", "errors.py"))
     paths.extend(root / "contoso" / name for name in (
         "__init__.py", "knowledge.py", "bounded.py", "configuration.py", "entrypoint.py",
-        "identity_probe.py", "identity_link.py", "token_client.py",
+        "identity_probe.py", "identity_link.py", "token_client.py", "api_center.py",
     ))
     for directory in ("router", "providers"):
         paths.extend(

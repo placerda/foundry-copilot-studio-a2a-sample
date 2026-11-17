@@ -7,11 +7,12 @@ This guide describes the existing **private-project SDK/ACR workflow** used for
 the current Motors demo. It does not request a new deployment, grant or login.
 It replaces the old Function-based instructions as the operational overview.
 
-> **Availability:** the `motors_*`, `publish_motors_router` and
-> `select_motors_router` helpers and their binding examples are still in the
-> prepared local working copy, not published on `main`. Commands in this guide
-> require that reviewed implementation. They are not executable instructions
-> for a fresh clone. See the [availability matrix](status.md#source-availability).
+The `motors_*`, `publish_motors_router` and `select_motors_router` helpers and
+placeholder-only binding examples are included in this revision. Running them
+against Azure still requires reviewed private bindings and existing access.
+For first-time configuration, read the [guided setup path](foundry-apim-studio.md)
+and [IaC inventory](../contoso/infra/README.md). Nothing in source publication
+creates, activates or accepts a new cloud deployment.
 
 ## Prerequisites
 
@@ -24,7 +25,7 @@ Azure CLI configuration directory. Do not switch the user's global context,
 create a new login unnecessarily, disable TLS or enable Foundry public access.
 Check the selected subscription and tenant before any mutation.
 
-Keep reviewed binding files outside Git. The local
+Keep reviewed binding files outside Git. The included
 `contoso\motors-admin.bindings.example.json` requires:
 
 | Binding group | Required values |
@@ -45,7 +46,7 @@ operator, project, private DNS, agent selector, definition or identity.
 
 ## Read-only checks
 
-From the prepared working copy, with the selected process-local Azure context:
+From the repository root, with the selected process-local Azure context:
 
 ```powershell
 .\.venv\Scripts\python.exe -m contoso.ops.motors_admin `
@@ -176,7 +177,7 @@ uses the original 65-second total deadline, including reply delivery.
 
 ## Catalog and specialist configuration
 
-The current local implementation uses `CONTOSO_ROUTER_SCOPE=api-center`.
+The current Motors implementation uses `CONTOSO_ROUTER_SCOPE=api-center`.
 Its settings bind the API Center origin, APIM A2A base URL, Entra tenant/API
 application and explicit platform callers. The shared supplier variant is fixed.
 
@@ -201,6 +202,14 @@ required application role, validate bounded A2A input, remove forged headers
 and return sanitized failures. Studio uses Credential Manager's delegated token
 inside APIM. Logistics uses APIM's managed identity.
 Do not substitute an operator probe for positive Router-identity acceptance.
+
+The Studio policy's `studioConnectionName` parameter must equal the **existing**
+Credential Manager connection ID recorded in private dependency bindings.
+The connection template's `connectionName` defaults to `shared-owner` for a new
+environment. Pass the existing ID explicitly for maintenance; changing source
+placeholders is not a request to rename or recreate a live connection. The
+historical token/probe policies retain their old defaults and are not the
+current supplier route.
 
 The logistics source is embedded in the Prompt Agent instructions. It has no
 tools/RAG. Source version, route version, Agent Card version and selected

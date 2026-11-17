@@ -1,8 +1,12 @@
 import os
 import re
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 from urllib.parse import urlsplit
 from uuid import UUID
+
+if TYPE_CHECKING:
+    from .requester_certificate import RequesterCertificate
 
 
 MAX_BODY_BYTES = 32768
@@ -36,9 +40,10 @@ class CONTOSOSettings:
     tenant_id: str
     gateway_api_client_id: str
     requester_client_id: str
-    requester_client_secret: str = field(repr=False)
+    requester_client_secret: str | None = field(default=None, repr=False)
     a2a_gateway_url: str | None = None
     approved_apim_host: str | None = None
+    requester_certificate: "RequesterCertificate | None" = field(default=None, repr=False)
 
     @classmethod
     def from_env(cls, env):
@@ -55,7 +60,20 @@ class CONTOSOSettings:
             ids = [str(UUID(env[name])) for name in (
                 "CONTOSO_ENTRA_TENANT_ID", "CONTOSO_GATEWAY_API_CLIENT_ID", "CONTOSO_REQUESTER_CLIENT_ID")]
             credential_source = env.get("CONTOSO_REQUESTER_CREDENTIAL_SOURCE", "environment")
-            if credential_source == "windows":
+            secret, certificate = None, None
+            if credential_source != "windows-certificate" and "CONTOSO_REQUESTER_CERTIFICATE_PATH" in env:
+                raise ValueError
+            if credential_source == "windows-certificate":
+                if "CONTOSO_REQUESTER_CLIENT_SECRET" in env:
+                    raise ValueError
+                if __package__:
+                    from .requester_certificate import RequesterCertificate
+                else:
+                    from requester_certificate import RequesterCertificate
+                certificate = RequesterCertificate.from_windows(
+                    ids[2], env["CONTOSO_REQUESTER_CERTIFICATE_PATH"],
+                )
+            elif credential_source == "windows":
                 if "CONTOSO_REQUESTER_CLIENT_SECRET" in env:
                     raise ValueError
                 if __package__:
@@ -67,12 +85,13 @@ class CONTOSOSettings:
                 secret = env["CONTOSO_REQUESTER_CLIENT_SECRET"]
             else:
                 raise ValueError
-            if (not isinstance(secret, str) or not secret.strip() or len(secret) > 4096
-                    or any(ord(c) < 32 for c in secret)):
+            if certificate is None and (not isinstance(secret, str) or not secret.strip()
+                    or len(secret) > 4096 or any(ord(c) < 32 for c in secret)):
                 raise ValueError
         except (KeyError, ValueError, TypeError, AttributeError):
             raise ValueError("Invalid CONTOSO configuration") from None
-        return cls(gateway, *ids, secret, a2a_gateway_url=a2a_gateway, approved_apim_host=approved_host)
+        return cls(gateway, *ids, secret, a2a_gateway_url=a2a_gateway, approved_apim_host=approved_host,
+                   requester_certificate=certificate)
 
 
 @dataclass(frozen=True)

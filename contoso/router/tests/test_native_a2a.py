@@ -21,12 +21,12 @@ from google.protobuf.json_format import MessageToDict
 from contoso.identity_probe import build_probe_host
 from contoso.router.core import (
     AccessDenied, AuthMetadata, AuthScheme, CallerGrant, Capability, Catalog, CatalogEntry,
-    STUDIOVariant, Protocol, SourceMetadata,
+    Citation, ProviderResponse, ResponseStatus, RouterResponse, STUDIOVariant, Protocol, SourceMetadata,
 )
 from contoso.router.hosted import HostedRouter
 from contoso.router.native_a2a import build_native_host
 from contoso.router.runtime import RouterRuntime, RuntimeResult, ScopedToken
-from contoso.providers import ProviderTimeout, RawReply
+from contoso.providers import ProviderError, ProviderTimeout, RawReply
 
 HEADERS = {
     "A2A-Version": "1.0", "x-agent-user-id": "allowed-partition",
@@ -607,3 +607,630 @@ def test_disconnect_cancels_direct_native_answer_and_resets_context(rpc_path):
         assert ended.is_set()
         assert get_request_context().user_id is None
     asyncio.run(run())
+
+
+def teams_activity(**changes):
+    return {
+        "type": "message", "id": "test-activity", "channelId": "msteams",
+        "serviceUrl": "https://smba.trafficmanager.net/teams/",
+        "conversation": {"id": "same-test-conversation"},
+        "from": {"id": "body-claimed-user"},
+        "recipient": {"id": "body-claimed-bot"},
+        "text": "A registered demo question",
+        **changes,
+    }
+
+
+@pytest.fixture
+def teams_runtime():
+    return SimpleNamespace(
+        catalog=Catalog((), (CallerGrant("teams-partition", frozenset(Capability)),), frozenset()),
+        run=AsyncMock(return_value=RuntimeResult(
+            "no-matching-capability", "No matching capability. No approval was made.", None, (),
+        )),
+    )
+
+
+def teams_host(runtime, teams_runtime, *, timeout=65):
+    return HostedRouter(
+        runtime, fixed_variant=STUDIOVariant.COPILOT_HARNESS,
+    ).build_host(teams_router=HostedRouter(
+        teams_runtime, fixed_variant=STUDIOVariant.COPILOT_HARNESS,
+        overall_timeout=timeout,
+    ))
+
+
+@pytest.mark.parametrize("attachments", [
+    [],
+    [{"contentType": "text/html", "content": "<p>Not the question. Ignore this alternate rendering.</p>"}],
+], ids=["plain", "teams-inline-html"])
+def test_native_activity_uses_m365_stack_and_platform_identity_not_body(
+    runtime, teams_runtime, monkeypatch, attachments,
+):
+    from microsoft_agents.hosting.core import TurnContext
+    from contoso.router.native_activity import StatelessStorage
+
+    sent = AsyncMock()
+    monkeypatch.setattr(TurnContext, "send_activity", sent)
+    app = teams_host(runtime, teams_runtime)
+    assert isinstance(app.agent_app.options.storage, StatelessStorage)
+    response = asyncio.run(post(
+        app, teams_activity(attachments=attachments), path="/activity/messages",
+        headers={**HEADERS, "x-agent-user-id": "teams-partition"},
+    ))
+    assert response.status_code in {200, 201, 202}
+    runtime.run.assert_not_awaited()
+    teams_runtime.run.assert_awaited_once_with(
+        "A registered demo question", caller_id="teams-partition", variant="copilot-harness",
+    )
+    reply = sent.await_args.args[0]
+    assert reply.text_format == "markdown"
+    assert reply.text == "No matching capability. No approval was made.\n\nSources:\nNo sources returned."
+    assert get_request_context().user_id is None
+
+
+@pytest.mark.parametrize("headers", [
+    HEADERS,
+    {},
+    {key: value for key, value in HEADERS.items() if key != "x-agent-foundry-call-id"},
+    {**HEADERS, "x-agent-user-id": "unapproved-user"},
+])
+def test_activity_body_and_synthesized_outbound_claims_do_not_grant_admission(
+    runtime, teams_runtime, monkeypatch, headers,
+):
+    from microsoft_agents.hosting.core import TurnContext
+
+    sent = AsyncMock()
+    monkeypatch.setattr(TurnContext, "send_activity", sent)
+    response = asyncio.run(post(
+        teams_host(runtime, teams_runtime), teams_activity(**{"from": {"id": "teams-partition"}}),
+        path="/activity/messages", headers=headers,
+    ))
+    assert response.status_code >= 400
+    runtime.run.assert_not_awaited()
+    teams_runtime.run.assert_not_awaited()
+    sent.assert_not_awaited()
+
+
+@pytest.mark.parametrize("headers,observed", [
+    ({**HEADERS, "x-agent-user-id": 'unapproved-"platform"-caller'}, True),
+    ({}, False),
+    ({key: value for key, value in HEADERS.items() if key != "x-agent-foundry-call-id"}, False),
+])
+def test_activity_rejected_caller_diagnostic_uses_only_verified_sdk_context(
+    runtime, teams_runtime, headers, observed, caplog,
+):
+    response = asyncio.run(post(
+        teams_host(runtime, teams_runtime),
+        teams_activity(text="private-question-never-log", **{"from": {"id": "private-body-caller"}}),
+        path="/activity/messages", headers=headers,
+    ))
+    assert response.status_code >= 400
+    own_logs = [record.getMessage() for record in caplog.records
+                if record.name == "contoso.router.native_activity"]
+    diagnostics = [line for line in own_logs if "reason=caller_not_approved" in line]
+    assert len(diagnostics) == int(observed)
+    if observed:
+        assert diagnostics[0].endswith(
+            "platform_caller=" + json.dumps(headers["x-agent-user-id"], ensure_ascii=True),
+        )
+        assert "platform_context_verified=true" in diagnostics[0]
+    assert not any(value in "\n".join(own_logs) for value in (
+        "private-question-never-log", "private-body-caller", HEADERS["x-agent-foundry-call-id"],
+    ))
+    runtime.run.assert_not_awaited()
+    teams_runtime.run.assert_not_awaited()
+
+
+@pytest.mark.parametrize("path", (*RPC_PATHS, "/responses"))
+def test_teams_allowlist_does_not_authorize_python_protocols(runtime, teams_runtime, path):
+    response = asyncio.run(post(
+        teams_host(runtime, teams_runtime), {"input": "Question", "store": False}
+        if path == "/responses" else envelope(), path=path,
+        headers={**HEADERS, "x-agent-user-id": "teams-partition"},
+    ))
+    assert "error" in response.json()
+    runtime.run.assert_not_awaited()
+    teams_runtime.run.assert_not_awaited()
+
+
+@pytest.mark.parametrize("changes", [
+    {"channelId": "emulator"},
+    {"serviceUrl": "http://smba.trafficmanager.net/teams/"},
+    {"serviceUrl": "https://smba.trafficmanager.net.evil.example/teams/"},
+    {"serviceUrl": "https://smba.trafficmanager.net:invalid/teams/"},
+    {"serviceUrl": "https://user:private@smba.trafficmanager.net/teams/"},
+    {"text": '{"question":"Question","studio_variant":"standard"}'},
+    {"text": "x" * 2001},
+    {"attachments": [{"contentType": "image/png", "contentUrl": "https://untrusted.invalid/image"}]},
+    {"attachments": [{"contentType": "text/html", "contentUrl": "https://untrusted.invalid/html"}]},
+    {"attachments": [
+        {"contentType": "text/html", "content": "<p>A registered demo question</p>"},
+        {"contentType": "application/vnd.ms-teams.file.download.info", "content": {}},
+    ]},
+])
+def test_activity_rejects_unsupported_channel_reply_target_or_input_before_provider_work(
+    runtime, teams_runtime, monkeypatch, changes,
+):
+    from microsoft_agents.hosting.core import TurnContext
+
+    sent = AsyncMock()
+    monkeypatch.setattr(TurnContext, "send_activity", sent)
+    response = asyncio.run(post(
+        teams_host(runtime, teams_runtime), teams_activity(**changes), path="/activity/messages",
+        headers={**HEADERS, "x-agent-user-id": "teams-partition"},
+    ))
+    assert response.status_code >= 400
+    runtime.run.assert_not_awaited()
+    teams_runtime.run.assert_not_awaited()
+    sent.assert_not_awaited()
+
+
+@pytest.mark.parametrize(
+    "raw", [b'{"text":"one","text":"two"}', b"[" + b" " * 65536 + b"]"],
+    ids=["duplicate-field", "oversized"],
+)
+def test_activity_bounds_and_duplicate_field_rejection_precede_sdk(
+    runtime, teams_runtime, raw,
+):
+    response = asyncio.run(post(
+        teams_host(runtime, teams_runtime), path="/activity/messages", raw=raw,
+        headers={**HEADERS, "x-agent-user-id": "teams-partition"},
+    ))
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "invalid_activity"
+    teams_runtime.run.assert_not_awaited()
+
+
+def test_activity_discards_state_and_does_not_replay_conversation_history(
+    runtime, teams_runtime, monkeypatch,
+):
+    from microsoft_agents.hosting.core import TurnContext
+
+    monkeypatch.setattr(TurnContext, "send_activity", AsyncMock())
+
+    async def run():
+        app = teams_host(runtime, teams_runtime)
+        for question in ("First independent question", "Second independent question"):
+            response = await post(
+                app, teams_activity(text=question), path="/activity/messages",
+                headers={**HEADERS, "x-agent-user-id": "teams-partition"},
+            )
+            assert response.status_code in {200, 201, 202}
+        assert [call.args[0] for call in teams_runtime.run.await_args_list] == [
+            "First independent question", "Second independent question",
+        ]
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("question", ["x" * 24001, "\U0001f600" * 6001], ids=["ascii", "utf8"])
+def test_activity_reply_limit_counts_bytes_and_never_truncates_attribution(question):
+    from contoso.router.native_activity import render_result
+
+    with pytest.raises(ProviderError, match="byte limit"):
+        render_result(RuntimeResult("no-matching-capability", question, None, ()))
+
+
+def test_activity_rejects_query_or_content_encoding_before_sdk(runtime, teams_runtime):
+    async def run():
+        app = teams_host(runtime, teams_runtime)
+        headers = {**HEADERS, "x-agent-user-id": "teams-partition"}
+        query = await post(app, teams_activity(), path="/activity/messages?unexpected=value", headers=headers)
+        encoded = await post(
+            app, teams_activity(), path="/activity/messages",
+            headers={**headers, "Content-Encoding": "gzip"},
+        )
+        assert query.status_code == encoded.status_code == 400
+        teams_runtime.run.assert_not_awaited()
+    asyncio.run(run())
+
+
+def test_activity_budget_also_cancels_a_stalled_connector_reply(runtime, teams_runtime, monkeypatch, caplog):
+    from microsoft_agents.hosting.core import TurnContext
+
+    async def run():
+        cancelled = asyncio.Event()
+
+        async def send(*args, **kwargs):
+            try:
+                await asyncio.Event().wait()
+            finally:
+                cancelled.set()
+
+        monkeypatch.setattr(TurnContext, "send_activity", send)
+        response = await post(
+            teams_host(runtime, teams_runtime, timeout=0.1), teams_activity(),
+            path="/activity/messages", headers={**HEADERS, "x-agent-user-id": "teams-partition"},
+        )
+        assert response.status_code == 202
+        assert cancelled.is_set()
+        assert get_request_context().user_id is None
+    asyncio.run(run())
+    assert "outcome=failed error_class=TimeoutError" in caplog.text
+    assert "outcome=completed" not in caplog.text
+
+
+def test_activity_concurrent_turns_keep_platform_identity_and_call_ids_separate(
+    runtime, teams_runtime, monkeypatch,
+):
+    from microsoft_agents.hosting.core import TurnContext
+
+    monkeypatch.setattr(TurnContext, "send_activity", AsyncMock())
+
+    async def run():
+        teams_runtime.catalog = Catalog((), tuple(
+            CallerGrant(caller, frozenset(Capability))
+            for caller in ("teams-partition", "second-teams-partition")
+        ), frozenset())
+        both_started = asyncio.Event()
+        entered = []
+        result = teams_runtime.run.return_value
+
+        async def answer(question, *, caller_id, variant):
+            entered.append((question, caller_id))
+            if len(entered) == 2:
+                both_started.set()
+            await asyncio.wait_for(both_started.wait(), 2)
+            context = get_request_context()
+            assert context.user_id == caller_id
+            assert context.platform_headers()["x-agent-foundry-call-id"] == question
+            return result
+
+        teams_runtime.run.side_effect = answer
+        app = teams_host(runtime, teams_runtime)
+        replies = await asyncio.gather(*(
+            post(
+                app, teams_activity(text=call_id), path="/activity/messages",
+                headers={**HEADERS, "x-agent-user-id": caller, "x-agent-foundry-call-id": call_id},
+            )
+            for caller, call_id in (("teams-partition", "first-call"), ("second-teams-partition", "second-call"))
+        ))
+        assert all(response.status_code in {200, 201, 202} for response in replies)
+        assert set(entered) == {("first-call", "teams-partition"), ("second-call", "second-teams-partition")}
+        assert get_request_context().user_id is None
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("word_count", [150, 151])
+def test_activity_answer_word_limit_rejects_without_truncating(word_count):
+    from contoso.router.native_activity import render_result
+
+    answer = " ".join(["word"] * word_count)
+    result = RuntimeResult("no-matching-capability", answer, None, ())
+    if word_count > 150:
+        with pytest.raises(ProviderError, match="word limit"):
+            render_result(result)
+    else:
+        assert render_result(result) == answer + "\n\nSources:\nNo sources returned."
+
+
+def test_activity_reply_preserves_actual_attribution_without_runtime_envelope():
+    from contoso.router.native_activity import render_result
+
+    source = SourceMetadata(
+        "CONTOSO-MOTORS-LOGISTICS-001", "motors-logistics", "1", "Logistics source",
+        "Synthetic demonstration data", "approved-reference", frozenset({"Evidence limits"}),
+    )
+    response = ProviderResponse(
+        source.provider_id, Capability.KNOWLEDGE_KNOWLEDGE, None, ResponseStatus.ANSWERED,
+        "This is a fictional proposal, not a confirmed pickup.",
+        (Citation(source.source_id, source.provider_id, source.version, "Evidence limits"),),
+    )
+    text = render_result(RuntimeResult(
+        "answered", response.answer, RouterResponse(response, (source,)), ("test-only-path",),
+    ))
+    assert text.startswith(response.answer + "\n")
+    assert "**References**\n\nLogistics source (version 1)" in text
+    assert "Source ID: `CONTOSO-MOTORS-LOGISTICS-001`" in text
+    assert text.count(source.source_id) == 1
+    assert "Sections cited: Evidence limits" in text
+    assert "test-only-path" not in text
+    assert '"execution_path"' not in text
+
+
+def test_activity_markdown_separates_source_headings_without_shortening_citations():
+    from contoso.router.native_activity import render_result
+
+    source = SourceMetadata(
+        "CONTOSO-MOTORS-SUPPLIER-001", "supplier", "1", "Supplier proposal",
+        "Synthetic demonstration data", "approved-reference",
+        frozenset({"Fictional proposal", "Evidence limits"}),
+    )
+    citation = 'Source: CONTOSO-MOTORS-SUPPLIER-001, Version 1, Section: "Evidence limits".'
+    answer = (
+        "**Fictional proposal** 300 Friday, 200 Monday. It is **not approved**. "
+        '**Evidence limits** No inventory was verified. ' + citation
+    )
+    response = ProviderResponse(
+        source.provider_id, Capability.KNOWLEDGE_KNOWLEDGE, None, ResponseStatus.ANSWERED,
+        answer, (Citation(source.source_id, source.provider_id, source.version, "Evidence limits"),),
+    )
+    text = render_result(RuntimeResult(
+        "answered", answer, RouterResponse(response, (source,)), (),
+    ))
+    expected = (
+        "**Fictional proposal**\n\n300 Friday, 200 Monday. It is **not approved**."
+        "\n\n**Evidence limits**\n\nNo inventory was verified. " + citation
+    )
+    assert text.startswith(expected + "\n\n**References**\n")
+    assert text.split("\n\n**References**", 1)[0].split() == answer.split()
+    assert text.endswith("Sections cited: Evidence limits")
+
+
+def test_activity_groups_cited_sections_under_the_exact_source_version():
+    from contoso.router.native_activity import render_result
+
+    sources = (
+        SourceMetadata(
+            "SUPPLIER-001", "supplier", "1", "Earlier proposal",
+            "Synthetic demonstration data", "approved-reference",
+            frozenset({"Fictional proposal", "Evidence limits"}),
+        ),
+        SourceMetadata(
+            "SUPPLIER-001", "supplier", "2", "Revised proposal",
+            "Synthetic demonstration data", "approved-reference",
+            frozenset({"Buyer acceptance conditions", "Recommended next step"}),
+        ),
+    )
+    citations = (
+        Citation("SUPPLIER-001", "supplier", "2", "Buyer acceptance conditions"),
+        Citation("SUPPLIER-001", "supplier", "1", "Fictional proposal"),
+        Citation("SUPPLIER-001", "supplier", "2", "Recommended next step"),
+        Citation("SUPPLIER-001", "supplier", "1", "Evidence limits"),
+    )
+    response = ProviderResponse(
+        "supplier", Capability.SUPPLIER_DELIVERY_TERMS, STUDIOVariant.COPILOT_HARNESS,
+        ResponseStatus.ANSWERED, "No purchase was approved.", citations,
+    )
+    text = render_result(RuntimeResult(
+        "answered", response.answer, RouterResponse(response, sources), (),
+    ))
+    assert text == (
+        response.answer + "\n\n**References**\n\nEarlier proposal (version 1)"
+        "\nSource ID: `SUPPLIER-001`\n\nSections cited: Fictional proposal, Evidence limits"
+        "\n\nRevised proposal (version 2)\nSource ID: `SUPPLIER-001`"
+        "\n\nSections cited: Buyer acceptance conditions, Recommended next step"
+    )
+
+
+@pytest.mark.parametrize("source_id,provider_id,version", [
+    ("unknown", "supplier", "1"),
+    ("SUPPLIER-001", "unknown", "1"),
+    ("SUPPLIER-001", "supplier", "2"),
+])
+def test_activity_never_omits_a_citation_without_a_matching_source(source_id, provider_id, version):
+    from contoso.router.native_activity import render_result
+
+    source = SourceMetadata(
+        "SUPPLIER-001", "supplier", "1", "Supplier proposal",
+        "Synthetic demonstration data", "approved-reference", frozenset({"Evidence limits"}),
+    )
+    response = ProviderResponse(
+        "supplier", Capability.SUPPLIER_DELIVERY_TERMS, STUDIOVariant.COPILOT_HARNESS,
+        ResponseStatus.ANSWERED, "No inventory was verified.",
+        (Citation(source_id, provider_id, version, "Evidence limits"),),
+    )
+    with pytest.raises(ProviderError, match="no matching source"):
+        render_result(RuntimeResult(
+            "answered", response.answer, RouterResponse(response, (source,)), (),
+        ))
+
+
+async def start_teams_exchange(app):
+    incoming = asyncio.Queue()
+    await incoming.put({
+        "type": "http.request", "body": json.dumps(teams_activity()).encode(), "more_body": False,
+    })
+    path = "/activity/messages"
+    headers = {**HEADERS, "Content-Type": "application/json", "x-agent-user-id": "teams-partition"}
+    scope = {
+        "type": "http", "asgi": {"version": "3.0"}, "http_version": "1.1",
+        "method": "POST", "scheme": "https", "path": path, "raw_path": path.encode(),
+        "query_string": b"", "root_path": "",
+        "headers": [(name.lower().encode(), value.encode()) for name, value in headers.items()],
+        "client": ("127.0.0.1", 1), "server": ("container.invalid", 443),
+    }
+    events = []
+    acknowledged = asyncio.Event()
+
+    async def send(event):
+        events.append(event)
+        if event["type"] == "http.response.body" and not event.get("more_body", False):
+            acknowledged.set()
+
+    return SimpleNamespace(
+        task=asyncio.create_task(app(scope, incoming.get, send)),
+        incoming=incoming, events=events, acknowledged=acknowledged,
+    )
+
+
+def test_activity_ack_precedes_slow_provider_and_post_ack_disconnect_keeps_reply(
+    runtime, teams_runtime, monkeypatch,
+):
+    from microsoft_agents.hosting.core import TurnContext
+
+    sent = AsyncMock()
+    monkeypatch.setattr(TurnContext, "send_activity", sent)
+
+    async def run():
+        release, started = asyncio.Event(), asyncio.Event()
+        result = teams_runtime.run.return_value
+
+        async def pending(*args, **kwargs):
+            started.set()
+            await release.wait()
+            assert get_request_context().user_id == "teams-partition"
+            return result
+
+        teams_runtime.run.side_effect = pending
+        exchange = await start_teams_exchange(teams_host(runtime, teams_runtime))
+        try:
+            await asyncio.wait_for(exchange.acknowledged.wait(), 2)
+            await asyncio.wait_for(started.wait(), 2)
+            assert not exchange.task.done()
+            assert exchange.events[0]["status"] == 202
+            assert b"x-platform-server" in dict(exchange.events[0]["headers"])
+            await exchange.incoming.put({"type": "http.disconnect"})
+            await asyncio.sleep(0)
+            assert not exchange.task.done()
+            sent.assert_not_awaited()
+            release.set()
+            await asyncio.wait_for(exchange.task, 2)
+            assert sent.await_args.args[0].text.startswith(result.answer)
+            assert len([event for event in exchange.events if event["type"] == "http.response.start"]) == 1
+            assert get_request_context().user_id is None
+        finally:
+            exchange.task.cancel()
+            await asyncio.gather(exchange.task, return_exceptions=True)
+    asyncio.run(run())
+
+
+def test_activity_disconnect_before_ack_does_not_execute_deferred_provider(runtime, teams_runtime):
+    async def run():
+        entered, release = asyncio.Event(), asyncio.Event()
+        app = teams_host(runtime, teams_runtime)
+
+        @app.agent_app.before_turn
+        async def hold_admission(context, state):
+            entered.set()
+            await release.wait()
+            return True
+
+        exchange = await start_teams_exchange(app)
+        try:
+            await asyncio.wait_for(entered.wait(), 2)
+            await exchange.incoming.put({"type": "http.disconnect"})
+            await asyncio.sleep(0)
+            release.set()
+            with pytest.raises(asyncio.CancelledError):
+                await asyncio.wait_for(exchange.task, 2)
+            teams_runtime.run.assert_not_awaited()
+            assert get_request_context().user_id is None
+        finally:
+            exchange.task.cancel()
+            await asyncio.gather(exchange.task, return_exceptions=True)
+    asyncio.run(run())
+
+
+def test_activity_host_cancellation_cancels_accepted_work_and_releases_capacity(
+    runtime, teams_runtime, monkeypatch,
+):
+    from microsoft_agents.hosting.core import TurnContext
+
+    monkeypatch.setattr(TurnContext, "send_activity", AsyncMock())
+
+    async def run():
+        started, ended = asyncio.Event(), asyncio.Event()
+        result = teams_runtime.run.return_value
+
+        async def pending(*args, **kwargs):
+            try:
+                started.set()
+                await asyncio.Event().wait()
+            finally:
+                ended.set()
+
+        teams_runtime.run.side_effect = pending
+        app = teams_host(runtime, teams_runtime)
+        exchange = await start_teams_exchange(app)
+        try:
+            await asyncio.wait_for(started.wait(), 2)
+            exchange.task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await exchange.task
+            assert ended.is_set()
+            teams_runtime.run.side_effect = None
+            teams_runtime.run.return_value = result
+            response = await post(
+                app, teams_activity(), path="/activity/messages",
+                headers={**HEADERS, "x-agent-user-id": "teams-partition"},
+            )
+            assert response.status_code == 202
+            assert get_request_context().user_id is None
+        finally:
+            exchange.task.cancel()
+            await asyncio.gather(exchange.task, return_exceptions=True)
+    asyncio.run(run())
+
+
+def test_activity_rejects_excess_turn_before_ack_and_releases_all_capacity(runtime, teams_runtime, monkeypatch):
+    from microsoft_agents.hosting.core import TurnContext
+
+    monkeypatch.setattr(TurnContext, "send_activity", AsyncMock())
+
+    async def run():
+        entered, release, all_started = [], asyncio.Event(), asyncio.Event()
+        result = teams_runtime.run.return_value
+
+        async def pending(*args, **kwargs):
+            entered.append(args)
+            if len(entered) == 4:
+                all_started.set()
+            await release.wait()
+            return result
+
+        teams_runtime.run.side_effect = pending
+        app = teams_host(runtime, teams_runtime)
+        exchanges = [await start_teams_exchange(app) for _ in range(4)]
+        try:
+            await asyncio.wait_for(asyncio.gather(*(item.acknowledged.wait() for item in exchanges)), 2)
+            await asyncio.wait_for(all_started.wait(), 2)
+            rejected = await post(
+                app, teams_activity(), path="/activity/messages",
+                headers={**HEADERS, "x-agent-user-id": "teams-partition"},
+            )
+            assert rejected.status_code >= 400
+            assert len(entered) == 4
+            release.set()
+            await asyncio.wait_for(asyncio.gather(*(item.task for item in exchanges)), 2)
+            next_turn = await post(
+                app, teams_activity(), path="/activity/messages",
+                headers={**HEADERS, "x-agent-user-id": "teams-partition"},
+            )
+            assert next_turn.status_code == 202
+            assert len(entered) == 5
+        finally:
+            for item in exchanges:
+                item.task.cancel()
+            await asyncio.gather(*(item.task for item in exchanges), return_exceptions=True)
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("failure", ["provider-error", "provider-timeout", "answer-word-limit"])
+def test_activity_failure_after_ack_is_explicit_and_never_reported_as_completed(
+    runtime, teams_runtime, monkeypatch, caplog, failure,
+):
+    from microsoft_agents.hosting.core import TurnContext
+
+    sent = AsyncMock()
+    monkeypatch.setattr(TurnContext, "send_activity", sent)
+
+    async def run():
+        ended = asyncio.Event()
+
+        async def fail(*args, **kwargs):
+            if failure == "provider-error":
+                raise ProviderError("private-provider-error-never-show")
+            if failure == "answer-word-limit":
+                return RuntimeResult("no-matching-capability", "word " * 151, None, ())
+            try:
+                await asyncio.Event().wait()
+            finally:
+                ended.set()
+
+        teams_runtime.run.side_effect = fail
+        response = await post(
+            teams_host(runtime, teams_runtime, timeout=1), teams_activity(),
+            path="/activity/messages", headers={**HEADERS, "x-agent-user-id": "teams-partition"},
+        )
+        assert response.status_code == 202
+        assert sent.await_args.args[0].text == (
+            "Unable to answer this request. No business approval or booking was made."
+        )
+        assert "private-provider-error" not in sent.await_args.args[0].text
+        assert get_request_context().user_id is None
+        if failure == "provider-timeout":
+            assert ended.is_set()
+    asyncio.run(run())
+    assert "outcome=failed" in caplog.text
+    assert "outcome=completed" not in caplog.text

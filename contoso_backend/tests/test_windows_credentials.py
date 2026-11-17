@@ -82,3 +82,16 @@ def test_invalid_secret_never_written(monkeypatch, secret):
     monkeypatch.setattr(credentials, "_write", lambda *args: pytest.fail("OS write forbidden"))
     with pytest.raises(credentials.CredentialUnavailable):
         credentials.store_requester_secret(CLIENT, secret)
+
+
+@pytest.mark.parametrize("fingerprint", ["", "../other", "a" * 63, "g" * 64, None])
+def test_certificate_namespace_rejects_invalid_fingerprints(monkeypatch, fingerprint):
+    monkeypatch.setattr(credentials, "_read", lambda target: pytest.fail("OS access forbidden"))
+    with pytest.raises(credentials.CredentialUnavailable):
+        credentials.read_requester_certificate_key(CLIENT, fingerprint)
+
+
+def test_certificate_key_cannot_be_read_for_another_identity(monkeypatch):
+    monkeypatch.setattr(credentials, "_read", lambda target: (str(uuid4()), b"private-key"))
+    with pytest.raises(credentials.CredentialUnavailable):
+        credentials.read_requester_certificate_key(CLIENT, "a" * 64)

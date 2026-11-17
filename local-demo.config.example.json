@@ -5,6 +5,8 @@
   "CONTOSO_ENTRA_TENANT_ID": "<gateway-tenant-id>",
   "CONTOSO_GATEWAY_API_CLIENT_ID": "<gateway-api-application-id>",
   "CONTOSO_REQUESTER_CLIENT_ID": "<local-requester-application-id>",
+  "CONTOSO_REQUESTER_CREDENTIAL_SOURCE": "windows-certificate",
+  "CONTOSO_REQUESTER_CERTIFICATE_PATH": "C:\\Users\\<windows-user>\\AppData\\Local\\ContosoAgentDemo\\requester-public.pem",
   "CONTOSO_GATEWAY_URL": "https://<apim-name>.azure-api.net/api/a2a",
   "CONTOSO_APIM_HOST": "<apim-name>.azure-api.net"
 }

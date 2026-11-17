@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "dataverse_origin": "https://<environment>.api.crm.dynamics.com",
+  "studio_bot_id": "<reviewed-studio-bot-uuid>",
+  "studio_schema_name": "<reviewed-studio-schema-name>",
+  "studio_source_component_id": "<reviewed-source-component-uuid>",
+  "studio_instructions_sha256": "<reviewed-published-instructions-sha256>",
+  "studio_published_on": "<reviewed-publication-timestamp-with-timezone>",
+  "apim_resource_id": "<reviewed-apim-arm-resource-id>",
+  "apim_principal_id": "<reviewed-apim-managed-identity-uuid>",
+  "provider_name": "<reviewed-credential-manager-provider-name>",
+  "connection_name": "<reviewed-shared-connection-name>",
+  "oauth_client_id": "<reviewed-oauth-application-uuid>"
+}

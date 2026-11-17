@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "tenant_id": "<canonical-tenant-uuid>",
+  "operator_object_id": "<authorized-operator-uuid>",
+  "project_resource_id": "<existing-project-arm-id>",
+  "project_endpoint": "<matching-private-project-endpoint>",
+  "router_version": "<reviewed-numeric-version>",
+  "router_definition_sha256": "<reviewed-router-definition-sha256>",
+  "router_source_sha256": "<reviewed-router-source-archive-sha256>",
+  "router_principal_id": "<existing-router-identity-uuid>",
+  "logistics_version": "<reviewed-numeric-version>",
+  "logistics_definition_sha256": "<reviewed-logistics-definition-sha256>",
+  "logistics_principal_id": "<existing-logistics-identity-uuid>",
+  "logistics_model": "<existing-logistics-model-deployment>",
+  "studio_source_sha256": "<reviewed-local-studio-source-sha256>"
+}

@@ -1,3 +1,7 @@
+# HISTORICAL multi-service manifest, retained for legacy worker/tests.
+# Not the current Motors deployment entry point: its version-4 selector and
+# Knowledge/SDK services are historical. Do not run blanket azd up/deploy here.
+# Current private-project image publication/selection: ../docs/operations.md.
 name: contoso-private-network
 requiredVersions:
   azd: ">=1.36.0"
@@ -97,6 +101,11 @@ services:
         version: 2.0.0
     agentEndpoint:
       protocols: [responses, a2a, invocations]
+      versionSelector:
+        versionSelectionRules:
+          - type: FixedRatio
+            agentVersion: "4"
+            trafficPercentage: 100
     agentCard:
       description: Routes the four registered demo questions using the approved capability catalog.
       version: "1.0"
@@ -108,6 +117,7 @@ services:
       PYTHONNOUSERSITE: "1"
       CONTOSO_RUNTIME_ROLE: ${CONTOSO_ROUTER_RUNTIME_ROLE}
       CONTOSO_ROUTER_SCOPE: ${CONTOSO_ROUTER_SCOPE}
+      # Motors API Center settings belong to SDK publication, not this legacy worker.
       CONTOSO_ENTRA_TENANT_ID: ${CONTOSO_ENTRA_TENANT_ID}
       CONTOSO_STUDIO_ENVIRONMENT_ID: ${CONTOSO_STUDIO_ENVIRONMENT_ID}
       CONTOSO_STUDIO_STANDARD_SCHEMA: ${CONTOSO_STUDIO_STANDARD_SCHEMA}

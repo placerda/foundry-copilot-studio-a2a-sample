@@ -11,13 +11,15 @@ It does not create Azure resources, grant access or publish agents.
 | Your starting point | What to do |
 |---|---|
 | Existing configured Motors workstation | Run the launcher checks below, then use the demo |
-| Fresh clone of `main` | Install dependencies if developing, but first read [source availability](status.md#source-availability). The complete Motors runtime and certificate support are not published yet |
-| New Azure environment | Follow the [operator prerequisites](operations.md#prerequisites), not a one-command deployment |
+| Fresh clone of this revision | Run offline [development checks](#development-checks); current Motors source and certificate support are included |
+| New Azure environment | Follow the [guided Foundry → APIM → Studio path](foundry-apim-studio.md) and [operator prerequisites](operations.md#prerequisites), not a one-command deployment |
 
-**Do not deploy `contoso/infra/main.bicep` from the published baseline to
-reproduce the current demo.** That baseline still includes the legacy Function.
-The newer, local-only template disables it by default. Documentation updates
-do not change the template or migrate your environment.
+**Do not treat `contoso/infra/main.bicep` as a complete Motors deployment.**
+It now disables the legacy Function by default, but remains a partial
+infrastructure reference. It does not configure Studio, consent, API Center
+discovery or the complete APIM topology. Read the
+[infrastructure inventory](../contoso/infra/README.md) before selecting modules.
+No source update migrates an existing environment.
 
 ## Local application setup
 
@@ -37,8 +39,9 @@ python -m venv .venv-local
 npm ci
 ```
 
-These commands install the checked-out reference, not the unpublished Motors
-changes or Azure resources. Do not recreate an existing virtual environment.
+These commands install local client dependencies, not Azure resources.
+The local requirements pin the cryptography version used by certificate mode.
+Do not recreate an existing virtual environment.
 
 Create the ignored configuration files only when missing:
 
@@ -73,23 +76,34 @@ Do not put passwords, private keys, secrets or tokens in these files.
 An approved administrator used for this isolated demo is an exception, not a
 production access model.
 
-### Requester credential: published reference versus current demo
+### Requester credential
 
-The published launcher uses a client secret already provisioned in Windows
-Credential Manager, under `ContosoAgentDemo:requester:<client-id>`. Have the
-authorized operator provision it through an approved secure process. Never paste
-the value into a terminal command, config file or Git.
+The example selects the current **certificate requester**. Replace the example
+path with an absolute path on your own Windows computer:
 
-The current Motors workstation instead uses the newer **certificate requester**:
-
-| Local-only setting | Value |
+| Local setting | Value |
 |---|---|
 | `CONTOSO_REQUESTER_CREDENTIAL_SOURCE` | `windows-certificate` |
 | `CONTOSO_REQUESTER_CERTIFICATE_PATH` | Absolute path to the public PEM |
 
-This mode requires the unpublished `contoso_backend.requester_certificate`
-module and updated launcher/backend. Do not add these fields to a fresh clone
-until that implementation is available.
+The included `contoso_backend.requester_certificate` module and launcher support
+this mode. For an authorized first-time local credential setup, the following
+creates a new key in the current Windows user's Credential Manager and writes
+only its public certificate. Use a new filename and an existing parent directory;
+it does not register anything in Entra or change active settings:
+
+```powershell
+.\.venv-local\Scripts\python.exe -m contoso_backend.requester_certificate `
+  --client-id "<requester-application-id>" `
+  --public-certificate "<absolute-path-to-new-public.pem>"
+```
+
+An authorized operator must register that public PEM on the matching requester
+application and approve its APIM access before the launcher can work.
+The retained secret mode uses `CONTOSO_REQUESTER_CREDENTIAL_SOURCE=windows`
+(also the launcher's default when omitted), with no certificate-path field, and reads
+`ContosoAgentDemo:requester:<client-id>` from Credential Manager. It is not a
+fallback for a failed certificate. Never put either credential in config or Git.
 
 The private key is protected in the current Windows user's Credential Manager,
 not stored in Git or the public PEM. Only the public certificate is registered
@@ -159,9 +173,10 @@ separate checks.
 
 ## Development checks
 
-These commands exist in the published reference. Run them from the repository
-root with your revision's dependencies. Install only into a new or incomplete
-development environment:
+Run these commands from the repository root with this revision's dependencies.
+Install only into a new or incomplete development environment. The development
+lock includes the Activity adapter; do not replace the pinned agentserver
+Git dependencies with unrelated latest releases:
 
 ```powershell
 python -m venv .venv
@@ -182,10 +197,11 @@ $env:CONTOSO_TEST_PORT = "8019"
 npm run test:ui
 ```
 
-The current Motors working copy also has focused tests for catalog discovery,
-Teams, certificate authentication and guarded SDK operations. Those additions
-are not all on `main`. Synthetic tests prove contracts, not live service
-acceptance. Do not describe an old suite as a test of unpublished changes.
+The included suite covers catalog discovery, Teams, certificate authentication
+and guarded SDK operations. Browser tests use synthetic sign-in and service
+fixtures. They do not authenticate to Azure or Studio. Synthetic tests prove
+contracts, not live service acceptance. See [validation evidence](status.md#local-validation)
+for the clean-tree checks of this revision.
 
 ## Diagrams and historical tooling
 

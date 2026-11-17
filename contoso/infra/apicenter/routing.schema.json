@@ -1,0 +1,15 @@
+{
+  "type": "object",
+  "title": "Contoso governed A2A routing metadata",
+  "description": "Object container only. The Router enforces the complete contoso-routing v1 contract, sources and authorized APIM boundary on every request.",
+  "properties": {
+    "schema_version": {"type": "number"},
+    "publication_state": {"type": "string"},
+    "provider_id": {"type": "string"},
+    "capability": {"type": "string"},
+    "endpoint": {"type": "string"},
+    "protocol": {"type": "string"},
+    "protocol_version": {"type": "string"},
+    "agent_version": {"type": "string"}
+  }
+}

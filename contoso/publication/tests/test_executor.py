@@ -26,7 +26,7 @@ def resolver(host, port, **kwargs):
     return [(None, None, None, None, ("10.20.0.4", port))]
 
 
-def test_production_manifest_placeholders_are_bound(config):
+def test_legacy_manifest_placeholders_are_bound(config):
     import re
     manifest = Path(__file__).parents[2] / "azure.yaml"
     referenced = set(re.findall(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}", manifest.read_text()))

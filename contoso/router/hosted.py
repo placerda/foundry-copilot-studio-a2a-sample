@@ -6,14 +6,22 @@ import json
 from typing import Protocol
 
 from contoso.providers import ProviderTimeout
-from .core import AccessDenied, CatalogError, STUDIOVariant
-from .runtime import RouterRuntime, RuntimeResult
+from .core import AccessDenied, Catalog, CatalogError, STUDIOVariant
+from .runtime import RuntimeResult
 
 
 class PlatformContext(Protocol):
     user_id: str | None
 
     def platform_headers(self) -> dict[str, str]: ...
+
+
+class RoutingRuntime(Protocol):
+    catalog: Catalog
+
+    async def run(
+        self, question: str, *, caller_id: str, variant: str | None = None,
+    ) -> RuntimeResult: ...
 
 
 def current_platform_context() -> PlatformContext:
@@ -82,7 +90,7 @@ def _unique_fields(pairs: list[tuple[str, object]]) -> dict:
 class HostedRouter:
     def __init__(
         self,
-        runtime: RouterRuntime,
+        runtime: RoutingRuntime,
         *,
         context_factory: Callable[[], PlatformContext] = current_platform_context,
         overall_timeout: float = 75,
@@ -125,7 +133,7 @@ class HostedRouter:
             cancelled.cancel()
             await asyncio.gather(work, cancelled, return_exceptions=True)
 
-    def build_host(self):
+    def build_host(self, *, teams_router: "HostedRouter | None" = None):
         from azure.ai.agentserver.responses import (
             CreateResponse, ResponseContext, TextResponse,
         )
@@ -139,6 +147,7 @@ class HostedRouter:
             native_answer, name="CONTOSO Router",
             description="Routes approved questions and verifies configured source attribution.",
             overall_timeout=self.overall_timeout,
+            teams_router=teams_router,
         )
 
         @host.response_handler

@@ -1,6 +1,7 @@
 """Requester-only credentials in the current Windows user's protected store."""
 
 import ctypes
+import re
 from ctypes import wintypes
 from uuid import UUID
 
@@ -102,4 +103,27 @@ def store_requester_secret(client_id, secret):
     if len(blob) > 2560:
         raise CredentialUnavailable("Invalid requester credential")
     _write(target, client_id, blob)
+    return target
+
+
+def _certificate_target(client_id, fingerprint):
+    target = _target(client_id)
+    if not isinstance(fingerprint, str) or not re.fullmatch(r"[a-f0-9]{64}", fingerprint):
+        raise CredentialUnavailable("Invalid requester certificate identity")
+    return target + ":certificate:" + fingerprint
+
+
+def read_requester_certificate_key(client_id, fingerprint):
+    username, blob = _read(_certificate_target(client_id, fingerprint))
+    if username != client_id or not isinstance(blob, bytes) or not 0 < len(blob) <= 2560:
+        raise CredentialUnavailable("Invalid requester certificate credential")
+    return blob
+
+
+def store_requester_certificate_key(client_id, fingerprint, private_key):
+    target = _certificate_target(client_id, fingerprint)
+    if (not isinstance(private_key, bytes) or not 0 < len(private_key) <= 2560
+            or not private_key.startswith(b"-----BEGIN PRIVATE KEY-----\n")):
+        raise CredentialUnavailable("Invalid requester certificate credential")
+    _write(target, client_id, private_key)
     return target

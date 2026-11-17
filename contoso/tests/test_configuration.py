@@ -10,7 +10,7 @@ from contoso.configuration import (
 )
 from contoso.knowledge import ATTRIBUTION
 from contoso.entrypoint import build_host
-from contoso.router.core import AccessDenied, Capability, CatalogError, Protocol, VariantUnavailable
+from contoso.router.core import AccessDenied, Capability, CatalogError, Protocol, STUDIOVariant, VariantUnavailable
 from contoso.providers import (
     FoundryResponsesTransport, RawReply, extract_citations, standard_catalog_endpoint,
 )
@@ -87,7 +87,9 @@ def test_registered_router_preserves_no_match_and_does_not_guess_intents():
 
 def test_browser_suggestions_match_registered_business_scenarios():
     root = Path(__file__).resolve().parents[2]
-    scenarios = json.loads((root / "contoso-demo" / "scenarios.json").read_text())["scenarios"]
+    scenarios = json.loads(
+        (root / "contoso-demo" / "motors-scenarios.json").read_text(encoding="utf-8"),
+    )["scenarios"]
     configured = {scenario["question"]: scenario for scenario in scenarios}
 
     class Suggestions(HTMLParser):
@@ -102,9 +104,9 @@ def test_browser_suggestions_match_registered_business_scenarios():
 
     suggestions = Suggestions()
     suggestions.feed((root / "frontend" / "index.html").read_text(encoding="utf-8"))
-    assert len(suggestions.prompts) == 3
-    assert len(set(suggestions.prompts)) == 3
-    router = demo_router()
+    assert len(suggestions.prompts) == 5
+    assert len(set(suggestions.prompts)) == 5
+    router = demo_router(motors=True)
     for prompt in suggestions.prompts:
         assert prompt in configured
         assert asyncio.run(router(prompt)) == configured[prompt]["expected_capability"]
@@ -137,6 +139,26 @@ def test_active_scenario_sources_and_catalog_metadata_are_consistent(router_sett
             assert metadata.source_id == scenario["expected_source_id"]
             assert metadata.version == "1"
             assert metadata.title in text
+
+
+def test_motors_questions_route_both_specialists_without_changing_legacy_questions():
+    root = Path(__file__).resolve().parents[2]
+    scenarios = json.loads(
+        (root / "contoso-demo" / "motors-scenarios.json").read_text(encoding="utf-8"),
+    )["scenarios"]
+    router = demo_router(motors=True)
+    legacy = demo_router()
+    for scenario in scenarios:
+        question = scenario["question"]
+        assert asyncio.run(router(question)) == scenario["expected_capability"]
+        if scenario["expected_capability"] is None:
+            assert scenario["expected_source_id"] is None
+            continue
+        document = root / "contoso-demo" / scenario["expected_source_file"]
+        assert f"Source ID: {scenario['expected_source_id']}" in document.read_text(encoding="utf-8")
+        if scenario["expected_capability"] == "knowledge-knowledge":
+            assert asyncio.run(legacy(question)) is None
+    assert asyncio.run(router("Schedule transport and approve the purchase")) is None
 
 
 def test_actual_sdk_router_composition_registers_without_authentication_fallback(router_env):
@@ -320,3 +342,92 @@ def test_harness_only_required_settings_never_default(router_env, name):
     del env[name]
     with pytest.raises(CatalogError):
         HarnessRouterSettings.from_environment(env)
+
+
+def test_discovery_composition_has_fixed_shared_variant_and_no_legacy_broker(monkeypatch, router_env):
+    from contoso import entrypoint
+
+    class Credential:
+        def get_token(self, *args):
+            pytest.fail("Construction cannot acquire credentials")
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("Discovery scope cannot construct a legacy catalog or token broker")
+
+    captured = {}
+
+    class Host:
+        def __init__(self, runtime, **kwargs):
+            captured["runtime"] = runtime
+            captured.update(kwargs)
+
+        def build_host(self, *, teams_router=None):
+            captured["teams_router"] = teams_router
+            return self
+
+    monkeypatch.setattr(entrypoint, "ProviderTokens", forbidden)
+    monkeypatch.setattr(entrypoint.RouterSettings, "from_environment", forbidden)
+    monkeypatch.setattr(entrypoint.HarnessRouterSettings, "from_environment", forbidden)
+    monkeypatch.setattr(entrypoint, "HostedRouter", Host)
+    env = {
+        key: value for key, value in harness_only_env(router_env).items()
+        if key not in {"CONTOSO_GATEWAY_URL", "CONTOSO_STUDIO_HARNESS_ENDPOINT"}
+    } | {
+        "CONTOSO_ROUTER_SCOPE": "api-center",
+        "CONTOSO_APICENTER_ENDPOINT": "https://approved.data.eastus2.azure-apicenter.ms",
+        "CONTOSO_APIM_A2A_BASE_URL": "https://approved.azure-api.net/agents",
+    }
+    assert build_host(env, Credential()) is not None
+    assert captured["fixed_variant"].value == "copilot-harness"
+    assert captured["overall_timeout"] < 70
+    assert captured["teams_router"] is None
+    assert captured["runtime"].policy.base_url == env["CONTOSO_APIM_A2A_BASE_URL"]
+    root = Path(__file__).resolve().parents[2]
+    scenarios = json.loads(
+        (root / "contoso-demo" / "motors-scenarios.json").read_text(encoding="utf-8"),
+    )["scenarios"]
+    for scenario in scenarios:
+        assert asyncio.run(captured["runtime"].classifier(scenario["question"])) == scenario["expected_capability"]
+    assert captured["runtime"].catalog.lookup(
+        "approved-service", "knowledge-knowledge",
+    ).entry is None
+    del env["CONTOSO_APIM_A2A_BASE_URL"]
+    with pytest.raises(CatalogError):
+        build_host(env, Credential())
+
+
+@pytest.mark.parametrize("teams_callers", ['["teams-user"]', "[]", "", '["teams-user","teams-user"]'])
+def test_teams_discovery_grants_are_explicit_and_never_expand_other_protocols(
+    monkeypatch, router_env, teams_callers,
+):
+    from contoso import entrypoint
+
+    class Host:
+        def __init__(self, runtime, **kwargs):
+            self.runtime = runtime
+            self.fixed_variant = kwargs["fixed_variant"]
+
+        def build_host(self, *, teams_router=None):
+            self.teams_router = teams_router
+            return self
+
+    monkeypatch.setattr(entrypoint, "HostedRouter", Host)
+    env = {
+        **harness_only_env(router_env),
+        "CONTOSO_ROUTER_SCOPE": "api-center",
+        "CONTOSO_APICENTER_ENDPOINT": "https://approved.data.eastus2.azure-apicenter.ms",
+        "CONTOSO_APIM_A2A_BASE_URL": "https://approved.azure-api.net/agents",
+        "CONTOSO_TEAMS_PLATFORM_CALLER_IDS": teams_callers,
+    }
+    if teams_callers != '["teams-user"]':
+        with pytest.raises(CatalogError):
+            build_host(env, object())
+        return
+    host = build_host(env, object())
+    host.runtime.catalog.require_caller("approved-service")
+    host.teams_router.runtime.catalog.require_caller("teams-user")
+    assert host.teams_router.fixed_variant == STUDIOVariant.COPILOT_HARNESS
+    with pytest.raises(AccessDenied):
+        host.runtime.catalog.require_caller("teams-user")
+    with pytest.raises(AccessDenied):
+        host.teams_router.runtime.catalog.require_caller("approved-service")

@@ -66,10 +66,11 @@ def test_only_the_actual_apim_managed_identity_can_use_the_connection():
     assert "appIds:" not in text
 
 
-def test_fixed_connection_ids_match_the_candidate_token_policy():
+def test_default_connection_ids_preserve_the_legacy_token_policy():
     text = TEMPLATE.read_text()
     context = ET.parse(ROOT / "apim" / "token-policy.xml").find("./inbound/get-authorization-context")
     assert f"name: '{context.attrib['provider-id']}'" in text
-    assert f"name: '{context.attrib['authorization-id']}'" in text
+    assert f"param connectionName string = '{context.attrib['authorization-id']}'" in text
+    assert "name: connectionName" in text
     assert context.attrib["identity-type"] == "managed"
     assert "name: 'contoso-studio-v2'" not in text

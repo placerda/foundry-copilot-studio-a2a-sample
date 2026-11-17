@@ -10,7 +10,9 @@ export class PublicClientApplication {
     window.fakeAuthOptions = options;
     this.account = null;
   }
-  async initialize() {}
+  async initialize() {
+    if (window.initializeFailure) throw new Error("Synthetic private diagnostic");
+  }
   setActiveAccount(account) { this.account = account; }
   getActiveAccount() { return this.account; }
   async clearCache() { this.account = null; }

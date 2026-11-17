@@ -1,6 +1,10 @@
 targetScope = 'resourceGroup'
 
 param apimName string
+@description('Connection ID for a new environment, or the exact existing ID when maintaining a connection. Never rename an existing connection implicitly.')
+@minLength(1)
+@maxLength(80)
+param connectionName string = 'shared-owner'
 
 @minLength(36)
 @maxLength(36)
@@ -42,7 +46,7 @@ resource provider 'Microsoft.ApiManagement/service/authorizationProviders@2024-0
 
 resource connection 'Microsoft.ApiManagement/service/authorizationProviders/authorizations@2024-05-01' = {
   parent: provider
-  name: 'shared-owner'
+  name: connectionName
   properties: {
     authorizationType: 'OAuth2'
     oauth2grantType: 'AuthorizationCode'

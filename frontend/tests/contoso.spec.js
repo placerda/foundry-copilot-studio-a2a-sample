@@ -1,4 +1,8 @@
 import { test, expect } from "@playwright/test";
+import { readFile } from "node:fs/promises";
+const motorsScenarios = JSON.parse(await readFile(
+  new URL("../../contoso-demo/motors-scenarios.json", import.meta.url), "utf8",
+)).scenarios;
 const question = "We propose delivering 300 of 500 units Friday and the remaining 200 Monday. Does this satisfy the buyer's terms?";
 const noMatchQuestion = "Approve the supplier's partial delivery proposal.";
 const functionURL = "**/api/chat";
@@ -28,11 +32,11 @@ async function loginContoso(page, flag = true) {
   await expect(page.locator("#draft")).toBeEnabled();
 }
 
-test("supplier–buyer branding preserves native route binding labels", async ({ page }) => {
+test("Contoso Motors branding preserves native route binding labels", async ({ page }) => {
   await loginContoso(page);
-  await expect(page).toHaveTitle("Supplier–Buyer Agent Collaboration");
-  await expect(page.getByRole("heading", { name: "Supplier–Buyer Agent Collaboration" })).toBeVisible();
-  await expect(page.locator("select")).toHaveCount(1);
+  await expect(page).toHaveTitle("Contoso Motors | Agent collaboration");
+  await expect(page.getByRole("heading", { name: "Contoso Motors purchasing assistant" })).toBeVisible();
+  await expect(page.locator("select")).toHaveCount(0);
   await expect(page.locator(".connection-panel")).toContainText("Microsoft Foundry");
   await expect(page.locator(".connection-panel")).toContainText("Copilot Studio");
   await expect(page.locator("body"))
@@ -42,7 +46,7 @@ test("supplier–buyer branding preserves native route binding labels", async ({
 test("disabled or malformed public flag never enables a standalone chat fallback", async ({ page }) => {
   await page.addInitScript(() => { window.contosoTestEnabled = false; });
   await page.goto("/");
-  await expect(page.locator("select")).toHaveCount(1);
+  await expect(page.locator("select")).toHaveCount(0);
   await expect(page.locator(".connection-panel")).toBeVisible();
   await expect(page.locator("#error")).toContainText("Agent network is not configured");
   await page.locator("#login").click();
@@ -93,6 +97,35 @@ for (const integration of ["a2a"]) {
       expect(requests[1].contoso_options).toEqual({ integration, studio_variant: variant });
     });
   }
+}
+
+for (const [scenarioId, suggestion] of [
+  ["logistics-returnables", "Coordinate returnable packaging"],
+  ["logistics-evidence-limits", "Check missing collection information"],
+]) {
+  test(`${scenarioId}: registered suggestion preserves non-Studio attribution`, async ({ page }) => {
+    const value = result(null);
+    const requests = [];
+    await page.route(functionURL, route => {
+      requests.push(route.request().postDataJSON());
+      return route.fulfill({ json: value });
+    });
+    await loginContoso(page);
+    await page.getByRole("button", { name: suggestion }).click();
+    expect(requests).toHaveLength(0);
+    const registeredQuestion = motorsScenarios.find(scenario => scenario.id === scenarioId).question;
+    await expect(page.locator("#draft")).toHaveValue(registeredQuestion);
+    await page.locator("#send").click();
+    await expect(page.locator(".content").last()).toHaveText(value.answer);
+    await expect(page.locator(".contoso-metadata")).toContainText("returned-provider");
+    await expect(page.locator(".contoso-metadata")).toContainText("RETURNED-SOURCE");
+    await expect(page.locator(".contoso-metadata")).toContainText("2026-demo");
+    await expect(page.locator(".contoso-metadata")).not.toContainText("Copilot Studio configuration:");
+    expect(requests).toHaveLength(1);
+    expect(requests[0].messages).toEqual([{ role: "user", content: registeredQuestion }]);
+    expect(requests[0].contoso_options).toEqual({ integration: "a2a", studio_variant: "copilot-harness" });
+    expect(requests[0].identity_mode).toBe("shared-delegated");
+  });
 }
 
 test("unknown capability displays true literal answer and no provider or invented sources", async ({ page }) => {
@@ -189,7 +222,7 @@ test("Contoso logout invalidates token await and prevents late network request",
   await expect(page.locator("#processing")).toBeEmpty();
   await expect(page.locator("#send")).toBeDisabled();
   await expect(page.locator("#messages article")).toHaveCount(0);
-  await expect(page.locator("select")).toHaveCount(1);
+  await expect(page.locator("select")).toHaveCount(0);
   expect(calls).toBe(0);
 });
 
@@ -212,7 +245,7 @@ test("Contoso reset disposes late response and limit notice and preserves the fi
   await page.locator("#draft").fill("new");
   await page.locator("#send").click();
   await expect(page.locator(".limit")).toHaveCount(1);
-  await expect(page.locator("select")).toHaveCount(1);
+  await expect(page.locator("select")).toHaveCount(0);
   await page.locator("#reset").click();
   await expect(page.locator("#messages article, .limit")).toHaveCount(0);
 });

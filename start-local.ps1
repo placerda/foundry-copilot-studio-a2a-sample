@@ -34,7 +34,9 @@ $required = @(
     'CONTOSO_ENTRA_TENANT_ID', 'CONTOSO_GATEWAY_API_CLIENT_ID',
     'CONTOSO_REQUESTER_CLIENT_ID', 'CONTOSO_GATEWAY_URL'
 )
-$allowed = $required + @('CONTOSO_APIM_HOST')
+$allowed = $required + @(
+    'CONTOSO_APIM_HOST', 'CONTOSO_REQUESTER_CREDENTIAL_SOURCE', 'CONTOSO_REQUESTER_CERTIFICATE_PATH'
+)
 $values = @{ CONTOSO_REQUESTER_CREDENTIAL_SOURCE = 'windows' }
 foreach ($property in $config.PSObject.Properties) {
     if ($allowed -cnotcontains $property.Name) {
@@ -49,6 +51,17 @@ foreach ($name in $required) {
     if (-not $values.ContainsKey($name)) {
         throw "Missing configuration field: $name."
     }
+}
+if ($values.CONTOSO_REQUESTER_CREDENTIAL_SOURCE -cnotin @('windows', 'windows-certificate')) {
+    throw 'The launcher supports only windows or windows-certificate requester credentials.'
+}
+if ($values.CONTOSO_REQUESTER_CREDENTIAL_SOURCE -ceq 'windows-certificate') {
+    if (-not $values.ContainsKey('CONTOSO_REQUESTER_CERTIFICATE_PATH')) {
+        throw 'Missing configuration field: CONTOSO_REQUESTER_CERTIFICATE_PATH.'
+    }
+}
+elseif ($values.ContainsKey('CONTOSO_REQUESTER_CERTIFICATE_PATH')) {
+    throw 'A public certificate path requires windows-certificate requester credentials.'
 }
 if (Test-Path Env:CONTOSO_REQUESTER_CLIENT_SECRET) {
     throw 'Remove the conflicting process credential before using protected Windows storage.'
@@ -79,10 +92,12 @@ $names = @($values.Keys)
 foreach ($name in $names) {
     $previous[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
 }
-# An optional APIM hostname must not leak in from a different environment.
-if (-not $values.ContainsKey('CONTOSO_APIM_HOST')) {
-    $previous['CONTOSO_APIM_HOST'] = [Environment]::GetEnvironmentVariable('CONTOSO_APIM_HOST', 'Process')
-    $values['CONTOSO_APIM_HOST'] = $null
+# Optional settings must not leak in from a different environment.
+foreach ($name in @('CONTOSO_APIM_HOST', 'CONTOSO_REQUESTER_CERTIFICATE_PATH')) {
+    if (-not $values.ContainsKey($name)) {
+        $previous[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
+        $values[$name] = $null
+    }
 }
 
 Push-Location $PSScriptRoot

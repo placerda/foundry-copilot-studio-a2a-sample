@@ -33,8 +33,7 @@ p { line-height: 1.55; }
 .page-heading p { margin: 0; color: var(--muted); max-width: 75ch; }
 .workspace { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; }
 .identity-panel { padding: 16px 20px; border-bottom: 1px solid var(--border); min-width: 0; }
-.identity-panel label { display: block; font-weight: 600; margin-bottom: 8px; }
-.identity-panel select { width: 100%; max-width: 560px; min-height: 38px; border: 1px solid var(--border); border-radius: 4px; padding: 6px; background: #fff; }
+.identity-panel h3 { margin: 0 0 8px; }
 .identity-panel p { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; margin: 8px 0; }
 .context-panel { padding: 0 18px; background: #fff; border: 1px solid var(--border); border-radius: 8px; min-width: 0; }
 .context-panel > details { margin: 0; }
@@ -68,6 +67,7 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; padding: 8px 0; }
 .agent-flow h3 { margin: 0 0 8px; font-size: 16px; }
 .agent-flow li:not(:first-child) h3 { color: #115ea3; }
 .agent-flow p { font-size: 13px; color: var(--muted); margin: 0; }
+.alternate-agent { margin-top: 24px; }
 .flow-link { position: absolute; left: -120px; top: 30px; width: 112px; display: grid; gap: 4px; text-align: center; color: #115ea3; }
 .flow-link > span { font-size: 26px; line-height: 1; }
 .flow-link strong { font-size: 13px; font-weight: 600; }

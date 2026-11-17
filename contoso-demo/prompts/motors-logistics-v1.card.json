@@ -1,0 +1,11 @@
+{
+  "version": "1.0",
+  "description": "Orienta sobre recebimento e devolução de racks e caixas retornáveis na demonstração fictícia Contoso Motors, sem executar ações de negócio.",
+  "skills": [
+    {
+      "id": "receiving-returnables",
+      "name": "Logística Contoso Motors",
+      "description": "Explica a coordenação do recebimento e o processo de devolução de embalagens usando a fonte sintética versionada, sem confirmar estoque, aprovar compras ou agendar transportes."
+    }
+  ]
+}

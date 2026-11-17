@@ -66,11 +66,7 @@ def parse_a2a_result(value, request_id):
                              parse_constant=lambda _: (_ for _ in ()).throw(ValueError()))
     except (ValueError, UnicodeError, RecursionError):
         raise unavailable() from None
-    validated = validate_result(runtime, NATIVE_OPTIONS)
-    if (validated["contoso"]["status"] != "no-matching-capability"
-            and validated["contoso"]["studio_variant"] != "copilot-harness"):
-        raise unavailable()
-    return validated
+    return validate_result(runtime, NATIVE_OPTIONS)
 
 
 class A2ARequester(Requester):

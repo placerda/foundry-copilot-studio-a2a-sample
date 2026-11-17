@@ -37,8 +37,8 @@ test("known sign-in failures show only allowlisted codes and keep the user signe
 test("application labels and session states are in English", async ({ page }) => {
   await page.goto("/");
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
-  await expect(page).toHaveTitle("Supplier–Buyer Agent Collaboration");
-  await expect(page.getByRole("heading", { name: "Supplier–Buyer Agent Collaboration" })).toBeVisible();
+  await expect(page).toHaveTitle("Contoso Motors | Agent collaboration");
+  await expect(page.getByRole("heading", { name: "Contoso Motors purchasing assistant" })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "Session" })).toBeVisible();
   await expect(page.getByRole("region", { name: "Messages" })).toBeAttached();
   await expect(page.locator("#reset")).toBeHidden();

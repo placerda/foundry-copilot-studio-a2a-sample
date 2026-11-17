@@ -35,6 +35,8 @@ attrs==26.1.0
     #   referencing
 azure-ai-agentserver-a2a @ https://github.com/Azure/azure-sdk-for-python/archive/59d5588130b7b7bffa4db0deda290c0d22369c6d.zip#subdirectory=sdk/agentserver/azure-ai-agentserver-a2a
     # via -r contoso/requirements.in
+azure-ai-agentserver-activity==1.0.0b4
+    # via -r contoso/requirements.in
 azure-ai-agentserver-core @ https://github.com/Azure/azure-sdk-for-python/archive/59d5588130b7b7bffa4db0deda290c0d22369c6d.zip#subdirectory=sdk/agentserver/azure-ai-agentserver-core
     # via
     #   -r contoso/requirements.in
@@ -195,6 +197,10 @@ markupsafe==3.0.4
     # via werkzeug
 microsoft-agents-activity==1.9.0
     # via microsoft-agents-hosting-core
+microsoft-agents-authentication-msal==1.9.0
+    # via
+    #   -r contoso/requirements.in
+    #   azure-ai-agentserver-activity
 microsoft-agents-copilotstudio-client==1.9.0
     # via -r contoso/requirements.in
 microsoft-agents-hosting-core==1.9.0

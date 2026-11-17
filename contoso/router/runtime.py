@@ -127,6 +127,22 @@ class _State(TypedDict, total=False):
     result: RuntimeResult
 
 
+def validate_runtime_request(question: str, variant: str | None) -> None:
+    if not isinstance(question, str) or not question.strip() or len(question) > 2000:
+        raise CatalogError("Question must contain at most 2000 characters and 8000 bytes")
+    try:
+        encoded = question.encode("utf-8")
+    except UnicodeEncodeError:
+        raise CatalogError("Question must be valid Unicode") from None
+    if len(encoded) > 8000:
+        raise CatalogError("Question must contain at most 2000 characters and 8000 bytes")
+    if variant is not None:
+        try:
+            STUDIOVariant(variant)
+        except (TypeError, ValueError):
+            raise CatalogError("Unknown STUDIO variant") from None
+
+
 class RouterRuntime:
     def __init__(
         self,
@@ -233,19 +249,7 @@ class RouterRuntime:
     ) -> RuntimeResult:
         """caller_id is supplied only by the verified transport adapter."""
         self.catalog.require_caller(caller_id)
-        if not isinstance(question, str) or not question.strip() or len(question) > 2000:
-            raise CatalogError("Question must contain at most 2000 characters and 8000 bytes")
-        try:
-            encoded = question.encode("utf-8")
-        except UnicodeEncodeError:
-            raise CatalogError("Question must be valid Unicode") from None
-        if len(encoded) > 8000:
-            raise CatalogError("Question must contain at most 2000 characters and 8000 bytes")
-        if variant is not None:
-            try:
-                STUDIOVariant(variant)
-            except (TypeError, ValueError):
-                raise CatalogError("Unknown STUDIO variant") from None
+        validate_runtime_request(question, variant)
         state = await self.graph.ainvoke(
             {"question": question, "caller_id": caller_id, "variant": variant},
         )

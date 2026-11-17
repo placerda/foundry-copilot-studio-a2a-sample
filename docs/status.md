@@ -3,9 +3,10 @@
 [Home](../README.md) · [Setup](setup.md) · [Demo](demo.md) ·
 [Architecture](connectivity.md) · [Operations](operations.md)
 
-Documentation reviewed on **2026-11-14** against recorded demo acceptance from
-**2026-11-13** and the published Git tree. This is a dated status snapshot, not
-a continuously refreshed health report or a new live Azure audit.
+Source and documentation consolidated on **2026-11-17**. The cloud observations
+below remain the recorded demo acceptance from **2026-11-13**, reviewed on
+**2026-11-14**. Packaging and local tests are not new live acceptance, a
+continuously refreshed health report or a new Azure audit.
 
 ## Configured demo
 
@@ -29,36 +30,62 @@ proof that all business routes or administrative duties are accepted.
 
 ## Source availability
 
-The configured demo was advanced in a local working copy. At this documentation
-publication, `main` still has the earlier reference code. **This change publishes
-documentation only.** It does not silently commit pending code or redeploy Azure.
+This revision includes the previously local Motors implementation. The
+[guided code and setup path](foundry-apim-studio.md) follows that same
+implementation; it does not introduce a second simplified runtime.
 
-| Material | On `main`? | Consequence |
+| Material | In this revision? | Consequence |
 |---|---|---|
-| Reference frontend, Python server, launcher and config examples | Yes, older revisions | Useful for development, not a complete reproduction of current Motors |
-| Reference Router, provider clients, tests and base infrastructure | Yes, older revisions | Do not assume deployed version 20 matches this source |
-| API Center runtime and Motors catalog/route templates | No, pending code publication | Current discovery cannot be reproduced from a fresh clone |
-| Native Teams Activity implementation and new admission tests | No, pending code publication | Current Teams behavior is documented, not installable from this baseline |
-| Motors scenarios, prompts and source files | No, pending code publication | Use the [documented questions](demo.md#registered-questions) with the existing configured demo |
-| Certificate requester and updated launcher | No, pending code publication | The published launcher still uses the protected Windows secret mode |
-| `motors_admin`, dependency, publication and selection helpers | No, pending code publication | Operator commands apply only to the prepared working copy |
-| Function-disabled-by-default IaC update | No, pending code publication | Published `main.bicep` still contains the legacy Function module |
-| Current documentation | Yes | Explains current behavior, limitations and older code explicitly |
+| Frontend, Python server, launcher and config examples | Yes | Local client implementation; real sign-in needs your tenant and credentials |
+| Router, provider clients and focused tests | Yes | Current source is available; publishing source does not rebuild Router20 |
+| API Center runtime and Motors catalog/route templates | Yes | Per-request discovery and bounded APIM routes; resources/access still need setup |
+| Native Teams Activity implementation and admission tests | Yes | No separate Function or bot runtime; Teams publication and caller admission are separate |
+| Motors scenarios, prompts and source files | Yes | Versioned synthetic material, including exact source/citation contracts |
+| Certificate requester and updated launcher | Yes | Public PEM plus protected Windows private key; legacy secret mode retained explicitly |
+| Administration, dependency, publication and selection helpers | Yes | Reviewed private binding pins and authorized private connectivity required |
+| Function-disabled-by-default IaC | Yes | Partial reference, not a full fresh-environment installer |
+| Current documentation | Yes | Guided setup, code map, credential boundaries and historical tooling inventory |
 | Private bindings, credentials, raw logs and session evidence | Intentionally no | Keep outside Git. Only sanitized outcome summaries belong here |
 
-The local working branch was `local-apim-identity-runtime`, but its name is not
-proof of a published remote branch. Do not tell a new user to check it out as a
-way to obtain the missing code.
+A fresh source copy supports offline development. A complete new cloud
+environment has **not** been provisioned and accepted from this revision.
+Studio environment/channel availability, publishing, delegated consent, Entra
+grants, private DNS/networking and immutable release bindings remain external
+setup steps. Do not use the existing live deployment as proof of clean-room
+cloud reproducibility.
 
-Before declaring the demo reproducible, publish and review the implementation
-separately, update this matrix, then run the documented steps from a clean clone.
-Do not use the live deployment as proof that the repository contains its source.
+## Local validation
+
+Validation uses an isolated Git-tree export without local configuration,
+credentials or ignored operator files. Existing Python and Node dependencies
+are reused; this is a source-isolation check, not a fresh dependency download
+or a cloud deployment. Exact commands are in [development checks](setup.md#development-checks).
+The release preparation records the candidate tree and test outcomes separately
+from the dated live evidence above.
+
+Recorded on **2026-11-17**:
+
+| Check | Result |
+|---|---|
+| Current Python suite | 2,706 passed, 3 skipped, 11 subtests passed |
+| JavaScript contracts | 16 passed |
+| Fixture-based browser suite | 55 passed; isolated loopback test server |
+| Frontend build | Passed with `config.example.js`, not private client settings |
+| Local documentation paths | 82 links resolved |
+| Bicep compilation | Five templates compiled: foundation, catalog, Studio connection and both specialist routes |
+
+The Python run reported 36 SDK adapter deprecations and one background Azure
+Monitor configuration-worker warning when a test's network guard blocked its
+request. Bicep reported two fixed-public-cloud URL warnings and nine existing
+foundation resource-type warnings. These checks do not replace service-side
+template validation, a fresh dependency installation or live channel acceptance.
 
 ## Known gaps
 
 | Item | Status |
 |---|---|
-| Publish the current implementation and verify a clean clone | Pending, outside this documentation-only update |
+| Current implementation and clean-source validation | Source included; local checks are separate from cloud provisioning |
+| Provision and accept a complete fresh Azure/Studio environment | Not exercised; requires the external setup and authorizations above |
 | Revalidate both destinations through the final local UI after cutover | Pending. The prior unsubmitted draft is not an accepted invocation |
 | Check every still-needed legacy administrative duty against its replacement | Incomplete |
 | Exercise explicit version rollback with endpoint/identity/authorization preserved | Pending |

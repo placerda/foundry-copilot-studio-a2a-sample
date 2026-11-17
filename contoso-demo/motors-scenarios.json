@@ -1,0 +1,76 @@
+{
+  "data_classification": "Synthetic demonstration data",
+  "scenarios": [
+    {
+      "id": "supplier-partial-delivery",
+      "question": "We have an order for 500 units due Friday. We propose delivering 300 units Friday and 200 units Monday. Does this partial delivery satisfy the buyer's terms?",
+      "expected_capability": "supplier-delivery-terms",
+      "expected_source_id": "CONTOSO-MOTORS-SUPPLIER-001",
+      "expected_source_file": "knowledge/motors-supplier-delivery-terms-v1.md",
+      "answer_requirements": [
+        "Use Fictional proposal, Buyer acceptance conditions, Recommended next step and Evidence limits.",
+        "Explain the shortfall of 200 interior trim sets by Friday.",
+        "Require written acceptance before dispatch and cite the Motors source.",
+        "Do not approve purchases, confirm stock or schedule transport."
+      ]
+    },
+    {
+      "id": "supplier-delivery-evidence",
+      "question": "What conditions apply to the supplier's proposal to deliver 300 of 500 units Friday and the remaining 200 Monday, and what are the evidence limits?",
+      "expected_capability": "supplier-delivery-terms",
+      "expected_source_id": "CONTOSO-MOTORS-SUPPLIER-001",
+      "expected_source_file": "knowledge/motors-supplier-delivery-terms-v1.md",
+      "answer_requirements": [
+        "Explain the proposed split using only the synthetic Motors source.",
+        "Require written acceptance identifying the order, quantities, dates and transport-charge changes.",
+        "Do not invent an order number, inventory, calendar date or named approver."
+      ]
+    },
+    {
+      "id": "supplier-unsupported-penalty",
+      "question": "What exact penalty will the buyer charge for delivering the remaining 200 units Monday?",
+      "expected_capability": "supplier-delivery-terms",
+      "expected_source_id": "CONTOSO-MOTORS-SUPPLIER-001",
+      "expected_source_file": "knowledge/motors-supplier-delivery-terms-v1.md",
+      "answer_requirements": [
+        "State that the source establishes no penalty amount.",
+        "Cite Evidence limits without inventing a contractual amount."
+      ]
+    },
+    {
+      "id": "logistics-returnables",
+      "question": "How should Contoso Motors coordinate receiving and returning transport racks and returnable boxes for the proposed 300 interior trim sets Friday and 200 Monday?",
+      "expected_capability": "knowledge-knowledge",
+      "expected_source_id": "CONTOSO-MOTORS-LOGISTICS-001",
+      "expected_source_file": "knowledge/motors-logistics-returnables-v1.md",
+      "answer_requirements": [
+        "Use Receiving coordination, Returnable packaging process, Recommended next step and Evidence limits.",
+        "Identify missing packaging counts, return-area capacity and collection responsibilities.",
+        "Do not treat trim-set quantities as packaging counts or claim a booking or approval."
+      ]
+    },
+    {
+      "id": "logistics-evidence-limits",
+      "question": "What information is missing before planning the collection of Contoso Motors transport racks and returnable boxes?",
+      "expected_capability": "knowledge-knowledge",
+      "expected_source_id": "CONTOSO-MOTORS-LOGISTICS-001",
+      "expected_source_file": "knowledge/motors-logistics-returnables-v1.md",
+      "answer_requirements": [
+        "Request rack and box counts, available return-area capacity and responsible business roles.",
+        "State that no collection, receiving capacity or transport booking has been confirmed.",
+        "Cite the relevant sections of the synthetic Motors logistics source."
+      ]
+    },
+    {
+      "id": "no-matching-capability",
+      "question": "Approve the supplier's proposal to deliver 300 of 500 units Friday and the remaining 200 Monday.",
+      "expected_capability": null,
+      "expected_source_id": null,
+      "expected_source_file": null,
+      "answer_requirements": [
+        "Return an explicit no-matching-capability outcome.",
+        "Do not invoke a provider or claim to approve the change."
+      ]
+    }
+  ]
+}

@@ -22,6 +22,7 @@ from .validation import decode_json, validate_messages, validate_contoso_options
 MAX_RESPONSE_BYTES = 262144
 REQUEST_DEADLINE_MS = 90000
 logger = logging.getLogger("contoso_local")
+SHARED_MODE = "shared-delegated"
 IDENTITY_MODES = {
     "user-delegation": {
         "enabled": False,
@@ -39,7 +40,7 @@ IDENTITY_MODES = {
 
 
 def capabilities():
-    return {"default": "shared-delegated", "modes": IDENTITY_MODES}
+    return {"default": SHARED_MODE, "modes": IDENTITY_MODES}
 
 
 @dataclass(frozen=True)
@@ -73,10 +74,10 @@ class ChatService:
     def chat(self, raw, headers, request_id):
         caller = self.authorizer.verify(headers.get("authorization"))
         payload = decode_json(raw, headers, allow_identity_mode=True)
-        mode = payload.pop("identity_mode", "shared-delegated")
+        mode = payload.pop("identity_mode", SHARED_MODE)
         if not isinstance(mode, str) or mode not in IDENTITY_MODES:
             raise invalid()
-        if not IDENTITY_MODES[mode]["enabled"]:
+        if mode != SHARED_MODE or not IDENTITY_MODES[mode]["enabled"]:
             raise ChatFailure(409, "identity_mode_unavailable", IDENTITY_MODES[mode]["reason"])
         messages = validate_messages(payload, self.settings)
         options = validate_contoso_options(payload, self.settings)

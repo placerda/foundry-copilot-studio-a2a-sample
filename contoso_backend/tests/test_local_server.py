@@ -8,7 +8,7 @@ import pytest
 
 from contoso_backend.config import CONTOSOSettings, gateway_endpoint
 from contoso_backend.errors import ChatFailure
-from contoso_backend.local_server import ChatService, LocalServer, LocalSettings
+from contoso_backend.local_server import ChatService, LocalServer, LocalSettings, IDENTITY_MODES
 
 IDS = [str(UUID(int=i)) for i in range(1, 5)]
 SETTINGS = LocalSettings(*IDS[:3], CONTOSOSettings(
@@ -158,3 +158,12 @@ def test_backend_readiness(server):
     assert value["modes"]["shared-delegated"]["enabled"]
     assert not value["modes"]["user-delegation"]["enabled"]
     assert not value["modes"]["service-to-service"]["enabled"]
+
+
+@pytest.mark.parametrize("mode", ["user-delegation", "service-to-service"])
+def test_readiness_cannot_enable_another_scenario(server, monkeypatch, mode):
+    monkeypatch.setitem(IDENTITY_MODES, mode, {"enabled": True, "reason": "Forged readiness."})
+    body = json.dumps({**PAYLOAD, "identity_mode": mode}).encode()
+    status, _, raw = call(server, body=body)
+    assert status == 409
+    assert json.loads(raw)["error"]["code"] == "identity_mode_unavailable"

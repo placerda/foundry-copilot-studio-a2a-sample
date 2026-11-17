@@ -30,18 +30,19 @@ for (const [device, size] of [["desktop", { width: 1440, height: 1000 }], ["mobi
     await page.addInitScript(() => { window.contosoTestEnabled = true; });
     await page.goto("/");
     await expect(page.locator("#delivery-context")).not.toHaveAttribute("open", "");
-    await expect(page.locator("select")).toHaveCount(1);
-    await expect(page.locator("#identity-mode")).toHaveValue("shared-delegated");
+    await expect(page.locator("select")).toHaveCount(0);
+    await expect(page.locator("#identity-mode")).toHaveText("Scenario 3: Shared delegated connection");
     await expect(page.getByRole("heading", { name: "How the agents collaborate" })).toBeVisible();
     expect(await page.locator(".connection-panel").evaluate(node =>
       !!(node.previousElementSibling?.classList.contains("chat-panel")))).toBe(true);
     await expect(page.locator(".agent-flow li")).toHaveCount(3);
     await expect(page.locator(".agent-flow")).toContainText("Microsoft Foundry");
     await expect(page.locator(".agent-flow")).toContainText("Copilot Studio");
+    await expect(page.locator(".agent-flow")).toContainText("Foundry logistics");
     await expect(page.locator(".flow-link strong")).toHaveText(["A2A 1.0 / HTTPS", "A2A 1.0"]);
     await expect(page.locator(".client-protocol")).toHaveText("Loopback HTTP / JSON");
     expect(await page.locator(".agent-flow img").evaluateAll(images =>
-      images.length === 2 && images.every(image => image.complete && image.naturalWidth > 0))).toBe(true);
+      images.length === 3 && images.every(image => image.complete && image.naturalWidth > 0))).toBe(true);
     await expect(page.locator(".diagram-note")).toContainText("not a live execution trace");
     await expect(page.locator(".access-path")).not.toHaveAttribute("open", "");
     await expect(page.getByText("Synthetic demonstration", { exact: true })).toHaveCount(0);
@@ -53,6 +54,8 @@ for (const [device, size] of [["desktop", { width: 1440, height: 1000 }], ["mobi
     await expect(page.getByRole("heading", { name: "Original buyer request" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Supplier proposal", exact: true })).toBeVisible();
     await expect(page.getByText("Illustrative context only.", { exact: false })).toBeVisible();
+    await expect(page.locator(".context-content")).toContainText("fictional automaker");
+    await expect(page.locator(".context-content")).toContainText("interior trim kits");
     await expect(page.getByRole("button", { name: "Evaluate the delivery proposal" })).toBeDisabled();
     await page.locator("#delivery-context > summary").click();
     await page.locator("#login").click();

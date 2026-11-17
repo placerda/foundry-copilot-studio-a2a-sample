@@ -156,12 +156,24 @@ def test_native_http_failures_never_call_json_command_or_responses(native_env, s
     assert worker._token is None
 
 
+@pytest.mark.parametrize("task", [False, True])
+def test_native_non_studio_response_preserves_actual_source_attribution(task):
+    runtime = runtime_result(None)
+    result = parse_a2a_result(envelope(task=task, runtime=runtime), "request-id")
+    assert result["answer"] == runtime["answer"]
+    assert result["contoso"]["studio_variant"] is None
+    assert result["contoso"]["provider_id"] == runtime["provider_id"]
+    assert result["contoso"]["sources"] == runtime["sources"]
+    assert result["contoso"]["citations"] == runtime["citations"]
+
+
+@pytest.mark.parametrize("variant", [None, "copilot-harness"])
 @pytest.mark.parametrize("changes", [
-    {"studio_variant": "standard"}, {"studio_variant": None}, {"provider_id": None},
+    {"studio_variant": "standard"}, {"studio_variant": "unknown"}, {"provider_id": None},
     {"sources": []}, {"citations": []}, {"execution_path": []},
 ])
-def test_native_response_requires_actual_harness_attribution(changes):
-    value = {**runtime_result("copilot-harness"), **changes}
+def test_native_response_requires_actual_provider_attribution(variant, changes):
+    value = {**runtime_result(variant), **changes}
     with pytest.raises(ChatFailure):
         parse_a2a_result(envelope(runtime=value), "request-id")
 

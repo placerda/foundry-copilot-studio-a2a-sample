@@ -1,3 +1,5 @@
+// Partial infrastructure reference, not a complete Motors environment deployment.
+// Read README.md here before use; existing private deployments use separate reviewed modules.
 targetScope = 'resourceGroup'
 
 @description('Deploy only into a dedicated, new CONTOSO resource group. No existing resource references are used.')
@@ -37,6 +39,8 @@ param networkRuleBypassAllowedForTasks bool = false
 
 @description('Only set true when the parent explicitly requests model provisioning. Quota/advertised availability does not guarantee regional capacity.')
 param deployModel bool = false
+@description('Explicit opt-in for the retired Function/App Service reference. Leave false for the APIM-based Motors deployment.')
+param deployLegacyFunction bool = false
 param modelDeploymentName string = 'gpt-4o-mini'
 param modelName string = 'gpt-4o-mini'
 param modelVersion string = '2024-07-18'
@@ -128,7 +132,7 @@ module foundry 'foundry.bicep' = {
   }
 }
 
-module gateway 'gateway.bicep' = {
+module gateway 'gateway.bicep' = if (deployLegacyFunction) {
   name: 'contoso-gateway-${suffix}'
   params: {
     location: location
@@ -159,7 +163,7 @@ output networkResources object = network.outputs.resources
 output storageResources object = storage.outputs.resources
 output monitoringResources object = monitoring.outputs.resources
 output foundryResources object = foundry.outputs.resources
-output gatewayResources object = gateway.outputs.resources
+output gatewayResources object = deployLegacyFunction ? gateway!.outputs.resources : {}
 output privateEndpointCount int = includeHostQueueTableEndpoints ? 7 : 5
 output privateDnsZoneCount int = includeHostQueueTableEndpoints ? 11 : 9
 output gatewayInitiallyEnabled bool = false

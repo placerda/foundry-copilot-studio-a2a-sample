@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Supplier–Buyer Agent Collaboration</title>
+  <title>Contoso Motors | Agent collaboration</title>
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
@@ -11,9 +11,9 @@
        Light neutral surfaces, Segoe UI, restrained Microsoft blue. Context precedes the conversation;
        identity and routing stay explicit, and only returned evidence is shown as an agent result. -->
   <header class="app-header">
-    <a class="brand" href="./" aria-label="Supplier–Buyer Agent Collaboration home">
+    <a class="brand" href="./" aria-label="Contoso Motors home">
       <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
-      <span>Agent collaboration</span>
+      <span>Contoso Motors</span>
     </a>
     <nav aria-label="Session">
       <button id="login" disabled>Sign in with Microsoft</button>
@@ -23,20 +23,20 @@
   </header>
   <main>
     <section class="page-heading">
-      <div><h1>Supplier–Buyer Agent Collaboration</h1>
-        <p>Explore a delivery proposal against the buyer’s terms, with evidence from the agent response.</p>
+      <div><h1>Contoso Motors purchasing assistant</h1>
+        <p>Explore a supplier’s delivery proposal and returnable-packaging coordination, with evidence from the selected specialist.</p>
       </div>
     </section>
     <div class="workspace">
     <aside class="context-panel" aria-label="Demonstration context">
       <details id="delivery-context">
-      <summary><span>Delivery proposal</span><span class="context-summary">500 units · 300 Friday / 200 Monday</span></summary>
+      <summary><span>Delivery proposal</span><span class="context-summary">500 interior trim kits · 300 Friday / 200 Monday</span></summary>
       <div class="context-content">
-      <p class="context-intro">Illustrative context only. Not a live order, inventory check, or approval.</p>
+      <p class="context-intro">Illustrative context only. Contoso Motors is a fictional automaker ordering interior trim kits. Not a live order, inventory check, or approval.</p>
       <div class="order-comparison">
-        <section><h3>Original buyer request</h3><p class="quantity">500 <span>units</span></p><p>Delivery due <b>Friday</b></p></section>
+        <section><h3>Original buyer request</h3><p class="quantity">500 <span>trim kits</span></p><p>Delivery due <b>Friday</b></p></section>
         <div class="comparison-divider" aria-hidden="true">↓</div>
-        <section><h3>Supplier proposal</h3><dl><div><dt>Friday</dt><dd>300 units</dd></div><div><dt>Monday</dt><dd>200 units</dd></div></dl></section>
+        <section><h3>Supplier proposal</h3><dl><div><dt>Friday</dt><dd>300 trim kits</dd></div><div><dt>Monday</dt><dd>200 trim kits</dd></div></dl></section>
       </div>
       <p class="context-question">Does this partial delivery satisfy the buyer’s terms?</p>
       <section class="evidence-note"><h3>Keep the decision grounded</h3><p>Ask about conditions and evidence limits. A response is not authorization to change an order or approve a delivery.</p></section>
@@ -45,12 +45,8 @@
     </aside>
     <section class="chat-panel" aria-label="Collaboration workspace">
       <section class="identity-panel" aria-label="Identity scenario">
-        <label for="identity-mode">Studio identity scenario</label>
-        <select id="identity-mode" aria-describedby="identity-reason" disabled>
-          <option value="user-delegation" disabled>1. End-to-end user identity — not configured</option>
-          <option value="service-to-service" disabled>2. SDK Service-to-Service — not configured</option>
-          <option value="shared-delegated" selected>3. Shared delegated connection</option>
-        </select>
+        <h3>Studio identity</h3>
+        <p id="identity-mode">Scenario 3: Shared delegated connection</p>
         <p id="identity-reason" role="status">Checking availability…</p>
         <p id="identity-callers">App user: sign in. Studio identity: shared connection (unverified).</p>
       </section>
@@ -60,15 +56,17 @@
       <div class="conversation-body">
         <section id="empty-state" class="empty-state" aria-label="Start a conversation">
           <span class="conversation-symbol" aria-hidden="true">↔</span>
-          <h3>Bring the proposal to the buyer</h3>
-          <p>Ask whether the proposed split meets the terms, then inspect the returned sources and evidence limits.</p>
+          <h3>Review the proposal and returnable packaging</h3>
+          <p>Ask about the delivery terms or logistics, then inspect the selected specialist’s sources and evidence limits.</p>
           <p id="start-hint">Sign in with Microsoft to start. No question is sent until you choose Send.</p>
           <div class="suggestions" aria-label="Suggested questions">
             <button type="button" data-prompt="We have an order for 500 units due Friday. We propose delivering 300 units Friday and 200 units Monday. Does this partial delivery satisfy the buyer's terms?"><span>Evaluate the delivery proposal</span><span aria-hidden="true">↗</span></button>
             <button type="button" data-prompt="What conditions apply to the supplier's proposal to deliver 300 of 500 units Friday and the remaining 200 Monday, and what are the evidence limits?"><span>Check conditions and evidence limits</span><span aria-hidden="true">↗</span></button>
+            <button type="button" data-prompt="How should Contoso Motors coordinate receiving and returning transport racks and returnable boxes for the proposed 300 interior trim sets Friday and 200 Monday?"><span>Coordinate returnable packaging</span><span aria-hidden="true">↗</span></button>
+            <button type="button" data-prompt="What information is missing before planning the collection of Contoso Motors transport racks and returnable boxes?"><span>Check missing collection information</span><span aria-hidden="true">↗</span></button>
             <button type="button" data-prompt="Approve the supplier's proposal to deliver 300 of 500 units Friday and the remaining 200 Monday."><span>Explore an unsupported approval request</span><span aria-hidden="true">↗</span></button>
           </div>
-          <p class="suggestion-note">Suggestions fill your draft; they do not imply a supported capability or a successful outcome.</p>
+          <p class="suggestion-note">Suggestions only fill your draft. Questions outside the registered demo scenarios return no matching capability.</p>
         </section>
         <section id="messages" aria-label="Messages" aria-live="polite" aria-relevant="additions"></section>
       </div>
@@ -77,16 +75,16 @@
     <p id="error" role="alert"></p>
     <form id="chat-form">
       <label for="draft">Your message</label>
-      <textarea id="draft" rows="3" placeholder="Ask about the delivery proposal…" aria-describedby="composer-hint" disabled></textarea>
+      <textarea id="draft" rows="3" placeholder="Ask about delivery terms or returnable packaging…" aria-describedby="composer-hint" disabled></textarea>
       <div class="composer-actions"><p id="composer-hint">Review answers and sources before making a business decision.</p><button id="send" disabled>Send</button></div>
     </form>
     </div>
     </section>
     <section class="connection-panel" aria-labelledby="connection-title">
       <h2 id="connection-title">How the agents collaborate</h2>
-      <p class="connection-intro">Foundry routes your question. When a capability matches, it asks Copilot Studio for an evidence-backed answer.</p>
+      <p class="connection-intro">The private Foundry Router discovers capabilities in API Center and selects one specialist: Copilot Studio for supplier terms, or a Foundry Prompt Agent for logistics. Both routes use APIM.</p>
       <figure class="connection-diagram">
-        <ol class="agent-flow" aria-label="The browser uses loopback HTTP and JSON to the local Python requester. The requester reaches private Foundry through APIM using A2A 1.0 over HTTPS. Foundry communicates with Copilot Studio using A2A 1.0.">
+        <ol class="agent-flow" aria-label="The browser uses loopback HTTP and JSON to the local Python requester. The requester reaches private Foundry through APIM using A2A 1.0 over HTTPS. The Router discovers capabilities in API Center and selects Copilot Studio or Foundry logistics through APIM using A2A 1.0.">
           <li>
             <svg class="product-icon browser-icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="8" width="40" height="32" rx="3"/><path d="M4 17h40M10 12h2m3 0h2m3 0h2M15 25l-5 4 5 4m18-8 5 4-5 4m-7-9-4 18"/></svg>
             <h3>Your question</h3><p>Browser → local Python requester.</p><p class="client-protocol">Loopback HTTP / JSON</p>
@@ -97,16 +95,20 @@
             <h3>Microsoft Foundry</h3><p>The private agent finds<br>the matching capability.</p>
           </li>
           <li>
-            <span class="flow-link"><span aria-hidden="true">↔</span><strong>A2A 1.0</strong><small>agent to agent</small></span>
+            <span class="flow-link"><span aria-hidden="true">↔</span><strong>A2A 1.0</strong><small>via APIM</small></span>
             <img class="product-icon" src="./assets/copilot-studio.svg" width="40" height="40" alt="">
             <h3>Copilot Studio</h3><p>The agent consults<br>published supplier terms.</p>
+            <div class="alternate-agent">
+              <img class="product-icon" src="./assets/foundry.svg" width="40" height="40" alt="">
+              <h3>Foundry logistics</h3><p>The Prompt Agent consults<br>returnable-packaging guidance.</p>
+            </div>
           </li>
         </ol>
         <figcaption>A2A means agent-to-agent communication. The answer returns to this chat with any sources and citations provided.</figcaption>
       </figure>
       <details class="access-path">
         <summary>How this browser reaches the private agents</summary>
-        <p>Your browser sends the question to the local Python requester. The requester uses authenticated APIM to reach private Foundry, then Copilot Studio.</p>
+        <p>Your browser sends the question to the local Python requester. The requester uses authenticated APIM to reach private Foundry. The Router reads API Center for each request and calls one matching specialist through APIM, without a static fallback.</p>
         <p>Cloud connections use A2A 1.0 / JSON-RPC 2.0 over HTTPS. The requester provides access, not a separate conversational agent.</p>
       </details>
       <p class="diagram-note">Architecture overview, not a live execution trace. Actual sources and execution details appear with each response.</p>

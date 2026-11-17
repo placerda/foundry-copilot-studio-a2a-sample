@@ -6,7 +6,7 @@ from enum import Enum
 import json
 import logging
 import os
-from typing import NoReturn
+from typing import TYPE_CHECKING, NoReturn
 
 # These switches must precede importing the native SDK and creating its host.
 os.environ["OTEL_INSTRUMENTATION_A2A_SDK_ENABLED"] = "false"
@@ -40,6 +40,9 @@ _MAX_REPLY_BYTES = 1048576
 _READ_TIMEOUT = 10
 _logger = logging.getLogger(__name__)
 Answer = Callable[[Mapping[str, object], asyncio.Event], Awaitable[str]]
+
+if TYPE_CHECKING:
+    from .hosted import HostedRouter
 
 
 class _Rejection(Enum):
@@ -322,6 +325,7 @@ class _NativeResponsesHost(A2AAgentServerHost, ResponsesAgentServerHost):
 
 def build_native_host(
     answer: Answer, *, name: str, description: str, overall_timeout: float = 75,
+    teams_router: "HostedRouter | None" = None,
 ) -> _NativeResponsesHost:
     """Expose SDK A2A through direct routes and Hosted HTTP passthrough.
 
@@ -343,14 +347,26 @@ def build_native_host(
             input_modes=["text/plain"], output_modes=["text/plain"],
         )],
     )
-    host = _NativeResponsesHost(
+    host_type = _NativeResponsesHost
+    activity_options = {}
+    if teams_router is not None:
+        from .native_activity import NativeTeamsHost, StatelessStorage
+
+        host_type = NativeTeamsHost
+        activity_options["storage"] = StatelessStorage()
+    host = host_type(
         agent_card=card, request_handler=StatelessHandler(answer, overall_timeout=overall_timeout),
         context_builder=_CallContextBuilder(),
         store=InMemoryResponseProvider(),
         options=ResponsesServerOptions(
             default_fetch_history_count=1, resilient_background=False, steerable_conversations=False,
         ),
+        **activity_options,
     )
     host.add_middleware(_InvocationsAlias)
     host.add_middleware(_Boundary)
+    if teams_router is not None:
+        from .native_activity import configure_teams
+
+        configure_teams(host, teams_router)
     return host

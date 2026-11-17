@@ -16,15 +16,17 @@ paths. [Open the vector diagram](docs/contoso-motors-architecture.svg) or
 [download the editable source](docs/contoso-motors-architecture.excalidraw).
 The step-by-step flow remains in [How the current demo works](#how-the-current-demo-works).
 
-> **Read this first:** the configured demo is ahead of the source published on
-> `main`. This documentation describes both and labels the difference.
-> A fresh clone does **not** yet reproduce the complete current Motors demo.
-> See [current status and source availability](docs/status.md).
+> **Read this first:** this revision includes the current Motors implementation,
+> prompts, tests and sanitized binding examples. A clone can run offline checks;
+> it does **not** provision a working cloud environment. Private connectivity,
+> identities, Studio publication and consent require separate operator setup.
+> See [current status and evidence boundaries](docs/status.md).
 
 ## Start here
 
 | I want to… | Read |
 |---|---|
+| Follow Foundry → APIM → Copilot Studio in the code and configure it | [Guided implementation and setup path](docs/foundry-apim-studio.md) |
 | Run the already configured local application | [Local setup and startup](docs/setup.md#local-application-setup) |
 | Use the existing Teams app or try a demo question | [Demo walkthrough](docs/demo.md) |
 | Understand the agents, network and identities | [Architecture and connectivity](docs/connectivity.md) |
@@ -48,7 +50,7 @@ Stop your server with **Ctrl+C**.
 
 This starts the local application, not Azure resources. `npm run build` builds
 the frontend but does not start it. Do not stop another process if port 8000 is
-occupied. For a new computer, read the [source availability warning](docs/status.md#source-availability)
+occupied. For a new computer, read the [source and environment boundaries](docs/status.md#source-availability)
 and complete [setup](docs/setup.md) before running these commands.
 
 ## How the current demo works
@@ -100,10 +102,12 @@ are not enabled. This is a bounded demo, not an unrestricted assistant.
 | `contoso-demo/` | Synthetic scenarios and versioned reference material |
 | `docs/` | Usage, setup, architecture, operations and status |
 
-Some current Motors additions to these directories remain unpublished.
-Documentation is not a substitute for those files, deployment bindings,
-permissions, consent or cloud resources. The [availability matrix](docs/status.md#source-availability)
-lists the important gaps.
+The Motors runtime and operational helpers are included. Deployment bindings,
+permissions, consent and cloud resources are deliberately not bundled.
+The [availability matrix](docs/status.md#source-availability) separates source
+availability from provisioning and live acceptance. Start with the guided path;
+the retained multi-service `contoso/azure.yaml` is historical, not a shortcut
+for deploying the current topology.
 
 ## Safety and scope
 
