@@ -40,7 +40,7 @@ test("Contoso Motors branding preserves native route binding labels", async ({ p
   await expect(page.locator(".connection-panel")).toContainText("Microsoft Foundry");
   await expect(page.locator(".connection-panel")).toContainText("Copilot Studio");
   await expect(page.locator("body"))
-    .not.toContainText(/\bCIN\b|\bCIA\b|\bbottler\b|coca[- ]?cola|librarian/i);
+    .not.toContainText(/\blibrarian\b/i);
 });
 
 test("disabled or malformed public flag never enables a standalone chat fallback", async ({ page }) => {
@@ -83,7 +83,7 @@ for (const integration of ["a2a"]) {
       await expect(page.locator(".contoso-metadata")).toContainText("Actual downstream trace");
       await expect(page.locator("#messages img, #messages script")).toHaveCount(0);
       await expect(page.locator(".content").last()).toHaveText(result(variant).answer);
-      await expect(page.locator(".contoso-metadata")).not.toContainText("CIN-DEMO-CONSUMER-001");
+      await expect(page.locator(".contoso-metadata")).not.toContainText("CONTOSO-MOTORS-SUPPLIER-001");
       expect(requests).toEqual([{ messages: [{ role: "user", content: question }],
         contoso_options: { integration, studio_variant: variant }, identity_mode: "shared-delegated" }]);
       expect(JSON.stringify(requests)).not.toContain("tenant");
@@ -149,7 +149,7 @@ test("unknown capability displays true literal answer and no provider or invente
 
 for (const [label, changes] of [
   ["missing metadata", { contoso: undefined }],
-  ["legacy response metadata", { contoso: undefined, cin: result().contoso }],
+  ["unexpected response metadata", { contoso: undefined, unexpected_metadata: result().contoso }],
   ["wrong variant", { contoso: { ...result().contoso, studio_variant: "standard" } }],
   ["missing citation", { contoso: { ...result().contoso, citations: [] } }],
   ["wrong attribution", { contoso: { ...result().contoso,

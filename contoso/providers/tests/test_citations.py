@@ -188,7 +188,7 @@ def test_inline_section_clause_ends_before_descriptive_prose_or_footnote(suffix)
 A2A_REAL_FORMAT = (
     '**This is synthetic demonstration data.** It comes from '
     '**CONTOSO-DEMO-SUPPLIER-001, "Supplier partial-delivery terms," Version 1**, '
-    'which is fictional and is not Coca-Cola consumer research[1].\n\n'
+    'which is fictional and describes the Contoso demonstration only[1].\n\n'
     '**Consumer insight (from "Fictional proposal")**\n'
     'Example insight.\n\n'
     '**Questions to ask the retailer (from "Buyer acceptance conditions")**\n'
