@@ -6,13 +6,14 @@
 ## Choose the correct starting point
 
 This guide prepares a Windows client for an **existing, authorized deployment**.
-It does not create Azure resources, grant access or publish agents.
+**Creating your own Azure and Studio environment? Start with
+[Replicate the demo](replicate-demo.md), then return here for the local client.**
 
 | Your starting point | What to do |
 |---|---|
 | Existing configured Motors workstation | Run the launcher checks below, then use the demo |
-| Fresh clone of this revision | Run offline [development checks](#development-checks); current Motors source and certificate support are included |
-| New Azure environment | Follow the [guided Foundry → APIM → Studio path](foundry-apim-studio.md) and [operator prerequisites](operations.md#prerequisites), not a one-command deployment |
+| Fresh clone for code exploration | Run offline [development checks](#development-checks) |
+| New Azure and Studio environment | Follow [Replicate the demo](replicate-demo.md) from prerequisites through the first conversation |
 
 **Do not treat `contoso/infra/main.bicep` as a complete Motors deployment.**
 It now disables the legacy Function by default, but remains a partial

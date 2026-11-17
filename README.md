@@ -7,34 +7,42 @@ Answers explain fictional delivery and returnable-packaging conditions, with
 versioned source references. The agents do not approve purchases, verify stock
 or book transport.
 
-## Overview
-
-[![Contoso Motors architecture: Teams and local chat, Foundry Router, API Center discovery, APIM specialist routes, Copilot Studio supplier, logistics agent and private connectivity](docs/contoso-motors-architecture.png)](docs/contoso-motors-architecture.svg)
-
-The configured demo at a glance, with separate message, discovery and network
-paths. [Open the vector diagram](docs/contoso-motors-architecture.svg) or
-[download the editable source](docs/contoso-motors-architecture.excalidraw).
-The step-by-step flow remains in [How the current demo works](#how-the-current-demo-works).
-
-> **Read this first:** this revision includes the current Motors implementation,
-> prompts, tests and sanitized binding examples. A clone can run offline checks;
-> it does **not** provision a working cloud environment. Private connectivity,
-> identities, Studio publication and consent require separate operator setup.
-> See [current status and evidence boundaries](docs/status.md).
-
 ## Start here
+
+**Want to build this demo in your own environment? Start with
+[Replicate the Contoso Motors demo](docs/replicate-demo.md).**
+It walks through prerequisites, Azure resources, identities, Studio publication,
+Foundry agents, APIM routes, API Center, local startup and a first demo question.
+Each stage explains what to configure, which values to save and how to check it.
+Teams is an optional final step.
+
+### Learn the integration
+
+| Key question | Start reading here |
+|---|---|
+| How does a Foundry agent call a Copilot Studio agent over A2A? | [One request, from Router to Studio](docs/foundry-apim-studio.md#the-foundry-to-studio-connection) |
+| Where do I configure the agents' routes, backends and policies in APIM? | [The three APIM APIs](docs/foundry-apim-studio.md#configure-agent-routes-in-apim), then [deploy the routes](docs/replicate-demo.md#7-configure-the-three-apim-routes) |
+| How does APIM authenticate the Router and call Studio as the shared connection owner? | [Credential exchange inside APIM](docs/foundry-apim-studio.md#credential-exchange-inside-apim) |
+| How does the Router discover the right agent? | [API Center discovery](docs/foundry-apim-studio.md#discovery-is-separate-from-the-gateway) |
+| Where are the agent instructions, reference documents and runnable code? | [Follow a supplier question through the source](docs/foundry-apim-studio.md#1-follow-one-supplier-question) |
+
+APIM exposes and protects the agents' APIs. **It does not host their prompts or
+models.** The supplier is configured in Copilot Studio, the Router and logistics
+agent in Foundry, and their callable routes and credentials in APIM.
+
+### Run or maintain the demo
 
 | I want to… | Read |
 |---|---|
-| Follow Foundry → APIM → Copilot Studio in the code and configure it | [Guided implementation and setup path](docs/foundry-apim-studio.md) |
+| Build my own demo environment | [Replication guide](docs/replicate-demo.md) |
 | Run the already configured local application | [Local setup and startup](docs/setup.md#local-application-setup) |
 | Use the existing Teams app or try a demo question | [Demo walkthrough](docs/demo.md) |
 | Understand the agents, network and identities | [Architecture and connectivity](docs/connectivity.md) |
 | Operate the private deployment or update an agent | [Operator guide](docs/operations.md) |
-| Know what is deployed, tested, missing or legacy | [Current status](docs/status.md) |
 | Run local development checks | [Development checks](docs/setup.md#development-checks) |
+| Consult the reference deployment's acceptance record | [Current status](docs/status.md) |
 
-### Already configured on this Windows computer?
+### Already configured on your Windows computer?
 
 Open PowerShell in the repository root:
 
@@ -50,8 +58,17 @@ Stop your server with **Ctrl+C**.
 
 This starts the local application, not Azure resources. `npm run build` builds
 the frontend but does not start it. Do not stop another process if port 8000 is
-occupied. For a new computer, read the [source and environment boundaries](docs/status.md#source-availability)
-and complete [setup](docs/setup.md) before running these commands.
+occupied. For a new computer connected to an existing deployment, complete
+[local setup](docs/setup.md). For new Azure and Studio resources, follow the
+[replication guide](docs/replicate-demo.md).
+
+## Overview
+
+[![Contoso Motors architecture: Teams and local chat, Foundry Router, API Center discovery, APIM specialist routes, Copilot Studio supplier, logistics agent and private connectivity](docs/contoso-motors-architecture.png)](docs/contoso-motors-architecture.svg)
+
+The demo at a glance, with separate message, discovery and network paths.
+[Open the vector diagram](docs/contoso-motors-architecture.svg) or
+[download the editable source](docs/contoso-motors-architecture.excalidraw).
 
 ## How the current demo works
 
@@ -102,12 +119,10 @@ are not enabled. This is a bounded demo, not an unrestricted assistant.
 | `contoso-demo/` | Synthetic scenarios and versioned reference material |
 | `docs/` | Usage, setup, architecture, operations and status |
 
-The Motors runtime and operational helpers are included. Deployment bindings,
-permissions, consent and cloud resources are deliberately not bundled.
-The [availability matrix](docs/status.md#source-availability) separates source
-availability from provisioning and live acceptance. Start with the guided path;
-the retained multi-service `contoso/azure.yaml` is historical, not a shortcut
-for deploying the current topology.
+The [replication guide](docs/replicate-demo.md) explains how to supply your own
+resource IDs, permissions and consent. The retained multi-service
+`contoso/azure.yaml` is historical. Use the guide's initial setup sequence, then
+the [operator guide](docs/operations.md) for subsequent updates.
 
 ## Safety and scope
 

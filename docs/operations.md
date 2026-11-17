@@ -10,9 +10,11 @@ It replaces the old Function-based instructions as the operational overview.
 The `motors_*`, `publish_motors_router` and `select_motors_router` helpers and
 placeholder-only binding examples are included in this revision. Running them
 against Azure still requires reviewed private bindings and existing access.
-For first-time configuration, read the [guided setup path](foundry-apim-studio.md)
-and [IaC inventory](../contoso/infra/README.md). Nothing in source publication
-creates, activates or accepts a new cloud deployment.
+For first-time configuration, follow [Replicate the demo](replicate-demo.md).
+The `motors_admin`, publication and selector helpers validate the full reference
+deployment, including its Activity protocol. Use the replication guide's SDK
+path during bootstrap or for a local-only deployment. These maintenance helpers
+are not first-agent installers.
 
 ## Prerequisites
 

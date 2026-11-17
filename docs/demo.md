@@ -4,9 +4,9 @@
 [Operations](operations.md) · [Status](status.md)
 
 This walkthrough is for the **already configured Motors environment**.
-The latest implementation is not fully published on `main`.
-Read [source availability](status.md#source-availability) before preparing a new
-workstation or promising a reproducible deployment.
+To build your own environment, follow [Replicate the demo](replicate-demo.md)
+first. To connect a new workstation to an existing deployment, use
+[local setup](setup.md#local-application-setup).
 
 ## Business story
 

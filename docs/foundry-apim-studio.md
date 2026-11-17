@@ -1,11 +1,153 @@
-# Guided path: Foundry → APIM → Copilot Studio
+# Learn the integration: Foundry → APIM → Copilot Studio
 
-[Home](../README.md) · [Local setup](setup.md) · [Architecture](connectivity.md) ·
+[Home](../README.md#start-here) · [Replicate the demo](replicate-demo.md) · [Architecture](connectivity.md) ·
 [Operations](operations.md) · [Status](status.md)
 
 This guide shows how the Contoso Motors sample connects a Microsoft Foundry
 agent to a Copilot Studio agent through Azure API Management. It explains the
 code, authentication flow, and configuration steps.
+
+**Building your own environment? Follow the [replication guide](replicate-demo.md)
+in order.** This page explains the important implementation choices and provides
+the detailed Studio configuration used by that guide.
+
+## The Foundry-to-Studio connection
+
+The Hosted Router is Python code running in Foundry. It discovers an APIM URL
+in API Center, obtains a token for the Gateway API with its managed identity,
+and sends an **A2A 1.0 JSON-RPC `SendMessage`** request. APIM forwards that
+request to the published Copilot Studio A2A channel with a different credential.
+
+```text
+Foundry Hosted Router
+  -> APIM /agents/studio-copilot-harness/versions/1/a2a
+  -> Copilot Studio A2A client channel
+```
+
+The wire contract below is the shape sent by
+[`A2ATransport`](../contoso/providers/a2a.py), not a direct HTTP call to a model:
+
+```http
+POST /agents/studio-copilot-harness/versions/1/a2a
+Authorization: Bearer <Router-token-for-the-Gateway-API>
+Content-Type: application/json
+A2A-Version: 1.0
+```
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": "11111111-1111-4111-8111-111111111111",
+  "method": "SendMessage",
+  "params": {
+    "message": {
+      "messageId": "22222222-2222-4222-8222-222222222222",
+      "role": "ROLE_USER",
+      "parts": [{
+        "text": "What exact penalty will the buyer charge for delivering the remaining 200 units Monday?"
+      }]
+    },
+    "configuration": {
+      "acceptedOutputModes": ["text/plain"],
+      "returnImmediately": false
+    }
+  }
+}
+```
+
+Generate fresh UUIDs for `id` and `messageId` on each request. The IDs above
+illustrate the format required by the APIM schema.
+
+The adapter accepts a completed A2A task or a message response, extracts text,
+and validates the request ID and result. The Router then validates the answer's
+source attribution. It does not merely display any HTTP 200 response.
+
+For the **local application's entrance**, the same A2A envelope goes to APIM
+`/api/a2a` using the requester's token. That API forwards it to the Router's
+Foundry **invocations** endpoint. The adapter in
+[`native_a2a.py`](../contoso/router/native_a2a.py) handles the A2A envelope on
+that passthrough route. Do not confuse this entrance with the Router's outgoing
+call to Studio.
+
+## Configure agent routes in APIM
+
+The agent definitions live in Foundry and Studio. In APIM you configure three
+HTTP APIs, their POST operations, backend addresses, credentials and policies:
+
+| API / public path | Allowed caller | Backend / outbound credential | Template and policy |
+|---|---|---|---|
+| `contoso-a2a` / `/api/a2a` | Local requester application with `CONTOSO.Invoke` | Foundry Router `/endpoint/protocols/invocations?api-version=v1`, using APIM managed identity | [apim-business.bicep](../contoso/infra/apim-business.bicep), [a2a-policy.xml](../contoso/infra/apim/a2a-policy.xml) |
+| `contoso-studio-a2a-v1` / `/agents/studio-copilot-harness/versions/1/a2a` | Router identity with `CONTOSO.Connection.Use` | Fixed Studio A2A channel, using the shared delegated connection | [apim-studio-a2a.bicep](../contoso/infra/apim-studio-a2a.bicep), [studio-a2a-policy.xml](../contoso/infra/apim/studio-a2a-policy.xml) |
+| `contoso-logistics-a2a-v1` / `/agents/motors-logistics/versions/1/a2a` | Router identity with `CONTOSO.Connection.Use` | Foundry logistics `/endpoint/protocols/a2a`, using APIM managed identity | [apim-logistics-a2a.bicep](../contoso/infra/apim-logistics-a2a.bicep), [logistics-a2a-policy.xml](../contoso/infra/apim/logistics-a2a-policy.xml) |
+
+In the Azure portal, open **API Management → APIs → the API → Design → All
+operations** to inspect the installed policy. The templates already create the
+operations and substitute the parameters. There is no separate manual
+"register the agent prompt in APIM" step.
+
+| Parameters | Where to obtain the values |
+|---|---|
+| `apimName` | APIM resource name |
+| `tenantId`, `gatewayApiClientId` | Gateway API Entra tenant and application/client ID |
+| `requesterClientId`, `requesterPrincipalId` | Requester app client ID and its Enterprise Application object ID |
+| `routerClientId`, `routerPrincipalId` | Actual Hosted Router identity's client ID and service-principal object ID |
+| `foundryAccountName`, `foundryProjectName`, `routerAgentName` | Your Foundry resource/project and `contoso-foundry-agent` |
+| `studioEnvironmentId`, `studioAgentSchema` | Published Studio A2A channel URL |
+| `studioOauthClientId` | OAuth client registration used by Credential Manager |
+| `studioConnectionName` | Credential Manager connection ID, also used as `connectionName` in the connection template |
+
+The specialist modules expect an existing APIM managed identity and logger named
+`applicationinsights`. The Studio route also expects an authorized connection.
+Follow [stage 7 of the replication guide](replicate-demo.md#7-configure-the-three-apim-routes)
+for the deployment commands and role assignments.
+
+## Credential exchange inside APIM
+
+Read [studio-a2a-policy.xml](../contoso/infra/apim/studio-a2a-policy.xml) in this order:
+
+1. **`router-jwt`** validates the tenant, audience, exact Router client/principal,
+   app-only token type and `CONTOSO.Connection.Use` role.
+2. **`request-schema`** validates the bounded A2A message and protocol version.
+3. **`studio-connection`** calls `get-authorization-context` for provider
+   `contoso-studio-v2-pkce` and the configured connection ID.
+4. **`connection-jwt`** validates the delegated Studio token's audience, tenant,
+   OAuth client, expiration and `MCS.InvokeAsA2A` scope.
+5. **`set-header` / `rewrite-uri`** replaces `Authorization` with that delegated
+   token and fixes the destination to the published agent on
+   `https://api.powerplatform.com`.
+6. **Outbound policies** bound the response and remove credential/cookie headers.
+
+This is the key bridge: **Router managed identity authenticates to APIM.
+The shared user's delegated connection authenticates APIM to Studio.**
+It is not end-user on-behalf-of forwarding and not app-only Studio invocation.
+The Studio token stays in APIM.
+
+For logistics, the corresponding policy uses
+`authentication-managed-identity` with resource `https://ai.azure.com` instead
+of a Studio connection. The A2A message shape stays the same.
+
+## Discovery is separate from the gateway
+
+[`apicenter-motors.bicep`](../contoso/infra/apicenter-motors.bicep) publishes each
+capability, APIM endpoint, route version and citable source in API Center.
+[`APICenterClient`](../contoso/api_center.py) reads this inventory on each request.
+[`APIMRoutePolicy` and `DiscoveredRouterRuntime`](../contoso/router/discovery.py)
+validate the metadata, select a matching registered capability and call APIM.
+
+Registering an entry in API Center does **not** create an APIM API, publish a
+Studio agent or grant an identity permission. Configure those first. Conversely,
+an APIM API that is absent from the valid catalog will not be discovered by this
+Router.
+
+To adapt the example, change the relevant layer rather than every component:
+
+| Change | Edit/configure |
+|---|---|
+| Supplier instructions or knowledge | Studio prompt and approved source |
+| Studio destination or shared connection | Supplier APIM module parameters and Credential Manager |
+| Callable capability / route metadata | API Center record and the Router's supported capability contract |
+| Accepted demo questions | `motors-scenarios.json` and the classifier contract |
+| Browser entrance | Local SPA/API/requester configuration |
 
 ## 1. Follow one supplier question
 
@@ -59,9 +201,10 @@ Bearer token, not mTLS.
 
 ## 3. Understand the configuration before filling it in
 
-All `<...>` values in examples are deliberately invalid placeholders, not demo
-credentials. Obtain real IDs, endpoints and approved pins from your operator;
-do not infer them from display names or copy another user's values.
+All `<...>` values are placeholders. For your own deployment, collect the IDs
+and endpoints as you complete the [replication guide](replicate-demo.md).
+For an existing deployment, obtain them from its operator. App/client IDs,
+service-principal IDs and app registration object IDs are different values.
 
 ### Local application
 
@@ -87,9 +230,10 @@ to add to `local-demo.config.json`:
 | `CONTOSO_TEAMS_PLATFORM_CALLER_IDS` | Separate JSON array of approved Teams platform callers; omitting it leaves the Activity host unconfigured |
 
 The runtime uses managed identity, never an operator credential fallback.
-Preserve the deployed private-project SDK/ACR release workflow described in
-[operations](operations.md). The historical `contoso/azure.yaml` does not
-reconstruct these current settings or the current selector.
+Use [the initial SDK/ACR sequence](replicate-demo.md#6-build-and-bootstrap-the-hosted-router)
+for a new environment and [operations](operations.md) for the full reference
+deployment's maintenance. The historical `contoso/azure.yaml` does not
+reconstruct these settings.
 
 ### Private operator bindings
 
@@ -115,7 +259,6 @@ Using other names requires a separately reviewed adaptation, not relaxing pins.
 
 ## 4. Configure the Studio supplier and shared connection
 
-This section is an operator checklist, not an automated provisioning claim.
 Use an authorized Copilot Studio environment with the A2A client channel
 available, a licensed/authorized connection owner and the required Entra
 administrative permissions. If the channel is absent, resolve environment
@@ -176,17 +319,19 @@ availability first; do not substitute the legacy Standard SDK route.
    confirm that owner can access the published Studio agent. A template cannot
    grant consent on the owner's behalf. Do not store login links, codes or
    tokens in Git.
-9. Run authorized read-only `motors_dependencies ... studio-source` and
-   `... connection` checks with the reviewed binding files. These verify
-   metadata/configuration, not an actual business response. The final gate is
-   a bounded supplier question through the real Router identity and APIM route,
-   followed by response/citation validation. Keep that live acceptance separate
-   from local tests.
+9. For initial setup, verify the published source and authorized connection in
+   Studio/APIM, then continue with [the logistics agent](replicate-demo.md#5-create-the-logistics-prompt-agent).
+   After the full reference configuration and its bindings exist, the read-only
+   `motors_dependencies ... studio-source` and `... connection` checks can verify
+   this configuration again. They are maintenance checks, not prerequisites for
+   creating the agents. Test the business response through the actual Router
+   and APIM route in [the first conversation](replicate-demo.md#9-run-the-local-demo).
 
 ## 5. Connect APIM, API Center and Foundry
 
-Review the [IaC inventory](../contoso/infra/README.md) before any deployment.
-There is no single complete fresh-environment installer in this revision.
+For initial setup, follow [replication stages 2-8](replicate-demo.md#2-create-the-azure-foundation).
+The list below summarizes how the components connect. The
+[IaC inventory](../contoso/infra/README.md) describes each module's scope.
 
 1. Establish the approved private Foundry project, model, ACR build path,
    identities, private endpoints/DNS and connectivity. The demo uses APIM
@@ -206,10 +351,12 @@ There is no single complete fresh-environment installer in this revision.
    `apicenter-motors.bicep`. Keep unrelated APIs. Grant the Router catalog-read
    access and configure its exact data-plane origin. An ARM inventory read
    alone does not prove that the Hosted identity can discover these records.
-5. Publish the Router image and select a version only through the reviewed
-   workflow in [operations](operations.md#update-a-router-image). Preserve
-   rollback pins. `create_prompt` is a guarded logistics **version-1 bootstrap**
-   helper, not a general updater for the existing version 6.
+5. Build and create the first Router using
+   [replication stage 6](replicate-demo.md#6-build-and-bootstrap-the-hosted-router),
+   then configure business routing in stage 8. For subsequent changes to the full
+   reference deployment, use [operations](operations.md#update-a-router-image).
+   `create_prompt` is a logistics **version-1 bootstrap** helper, not a general
+   updater for an agent with later versions.
 6. Enable optional Teams entry through the native publication and admission
    process in [operations](operations.md#teams-admission-and-delivery), then
    install/use the approved Teams app. No separate Function is required.
@@ -234,9 +381,8 @@ permission to roll the Foundry selection back to version 1.
 5. **Rollback exercise:** preserve old pins and separately authorize/test the
    reverse selection. Keeping a return version is not rollback evidence.
 
-The live final local UI and rollback gaps remain in [status](status.md#known-gaps).
-No new cloud provisioning, deployment or live acceptance was performed while
-consolidating this source.
+Keep your deployment's results with its private setup record. The original
+demo's acceptance history is recorded in [status](status.md).
 
 ## Optional and historical material
 

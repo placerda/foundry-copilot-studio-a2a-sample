@@ -1,9 +1,9 @@
 # Infrastructure inventory and deployment boundaries
 
-Read [the guided setup](../../docs/foundry-apim-studio.md) and
-[operations](../../docs/operations.md) first. These are composable references,
-**not a one-command installer** for the current Motors environment.
-No template invocation is part of cloning, building or offline testing.
+Start with [Replicate the demo](../../docs/replicate-demo.md) for the creation
+order, required inputs and deployment commands. To learn how agent routes and
+credentials work, read [the APIM walkthrough](../../docs/foundry-apim-studio.md#configure-agent-routes-in-apim).
+This page is the reference inventory of the composable templates.
 
 ## Current Motors building blocks
 
