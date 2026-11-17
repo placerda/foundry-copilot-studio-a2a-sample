@@ -119,3 +119,10 @@ Optional Azure Container Apps hosting is **not deployed**. The current entry
 points are the local application and Teams. Production readiness, final local
 UI revalidation and the remaining operational checks are tracked in
 [known gaps](docs/status.md#known-gaps).
+
+## License
+
+The sample's original code and documentation are available under the
+[MIT license](LICENSE). Microsoft product icons, trademarks and third-party
+dependencies retain their own terms. See [third-party notices](THIRD_PARTY_NOTICES.md)
+and [icon attribution](docs/icons/README.md).
