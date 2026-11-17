@@ -72,7 +72,12 @@ call to Studio.
 ## Configure agent routes in APIM
 
 The agent definitions live in Foundry and Studio. In APIM you configure three
-HTTP APIs, their POST operations, backend addresses, credentials and policies:
+HTTP APIs, their POST operations, backend addresses, credentials and policies.
+
+[![The requester calls APIM's entry API to reach the Hosted Router. That same Router calls separate supplier and logistics APIs, each with its own backend credential.](diagrams/apim-agent-routes.png)](diagrams/apim-agent-routes.svg)
+
+[Editable diagram](diagrams/apim-agent-routes.excalidraw).
+The table gives the full paths abbreviated in the diagram:
 
 | API / public path | Allowed caller | Backend / outbound credential | Template and policy |
 |---|---|---|---|
@@ -102,6 +107,10 @@ Follow [stage 7 of the replication guide](replicate-demo.md#7-configure-the-thre
 for the deployment commands and role assignments.
 
 ## Credential exchange inside APIM
+
+[![The Foundry Router sends an application token to APIM. APIM replaces it with the shared connection owner's delegated Studio token while forwarding the A2A request.](diagrams/studio-credential-bridge.png)](diagrams/studio-credential-bridge.svg)
+
+[Editable diagram](diagrams/studio-credential-bridge.excalidraw).
 
 Read [studio-a2a-policy.xml](../contoso/infra/apim/studio-a2a-policy.xml) in this order:
 
@@ -133,6 +142,10 @@ capability, APIM endpoint, route version and citable source in API Center.
 [`APICenterClient`](../contoso/api_center.py) reads this inventory on each request.
 [`APIMRoutePolicy` and `DiscoveredRouterRuntime`](../contoso/router/discovery.py)
 validate the metadata, select a matching registered capability and call APIM.
+
+[![The Router reads API Center, receives route and source metadata, then invokes the approved A2A route through APIM. The catalog does not proxy the request.](diagrams/catalog-discovery.png)](diagrams/catalog-discovery.svg)
+
+[Editable diagram](diagrams/catalog-discovery.excalidraw).
 
 Registering an entry in API Center does **not** create an APIM API, publish a
 Studio agent or grant an identity permission. Configure those first. Conversely,

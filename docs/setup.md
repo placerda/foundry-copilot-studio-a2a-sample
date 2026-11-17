@@ -79,6 +79,14 @@ production access model.
 
 ### Requester credential
 
+The application uses **OAuth 2.0 Client Credentials with certificate-based
+client authentication**. Browser user sign-in is a separate flow with a
+different token and audience:
+
+[![User sign-in sends a local API token to Python. Separately, the Python requester signs a client assertion, obtains an application token from Entra, and sends that Bearer token to APIM.](diagrams/client-certificate-auth.png)](diagrams/client-certificate-auth.svg)
+
+[Editable diagram](diagrams/client-certificate-auth.excalidraw).
+
 The example selects the current **certificate requester**. Replace the example
 path with an absolute path on your own Windows computer:
 
@@ -220,6 +228,17 @@ Use the existing Node.js and Playwright environment. Omit `--png` to generate
 only SVG and Excalidraw. The Mermaid flows in
 [README](../README.md#how-the-current-demo-works) and [connectivity](connectivity.md)
 remain complementary technical views. Keep all current views and prose consistent.
+
+The focused diagrams beside the authentication, APIM, discovery and initial
+Router setup explanations use the same generator and visual conventions:
+
+```powershell
+node tools\render-motors-architecture.mjs --guides --png
+```
+
+Their PNG, SVG and editable Excalidraw files are in `docs/diagrams/`.
+This command leaves the existing overview unchanged. PNG generation checks
+text widths, overlapping labels, canvas bounds and connectors crossing text.
 
 `tools\render-diagrams.mjs` and the older `docs/architecture*.svg`, `.png`
 and `.excalidraw` assets describe an earlier Internal-APIM target. They are

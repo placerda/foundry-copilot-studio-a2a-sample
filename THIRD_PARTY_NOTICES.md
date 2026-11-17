@@ -12,6 +12,7 @@ Microsoft's terms. They are excluded from the sample's MIT license.
 Sources and use terms:
 
 - [Azure Architecture Center icons](https://learn.microsoft.com/azure/architecture/icons/)
+- [Microsoft Entra architecture icons](https://learn.microsoft.com/entra/architecture/architecture-icons)
 - [Microsoft Power Platform icons](https://learn.microsoft.com/power-platform/guidance/icons)
 - [Microsoft 365 architecture icons and templates](https://learn.microsoft.com/previous-versions/microsoft-365/solutions/architecture-icons-templates)
 - [Icon provenance and generation details](docs/icons/README.md)

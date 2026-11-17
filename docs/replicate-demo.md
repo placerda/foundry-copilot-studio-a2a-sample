@@ -471,6 +471,12 @@ Confirm the `default` workspace contains `studio-copilot-harness` and
 
 ### Resolve the platform caller before enabling business routing
 
+This sequence connects stages 6-8 for the first deployment:
+
+[![Bootstrap the Router in identity-probe mode, configure APIM ingress, probe through the certificate requester, capture the verified caller, then publish and select the business version.](diagrams/router-bootstrap.png)](diagrams/router-bootstrap.svg)
+
+[Editable diagram](diagrams/router-bootstrap.excalidraw).
+
 The Router's platform caller ID is an SDK-verified value, not necessarily
 APIM's principal ID. With the new Router still in `identity-probe` mode, send
 the exact text `CONTOSO identity probe` through the new APIM `/api/a2a` API,

@@ -20,10 +20,12 @@ Teams is an optional final step.
 
 | Key question | Start reading here |
 |---|---|
+| How does the local client authenticate with a certificate? Is it mTLS? | [User sign-in and certificate authentication](docs/setup.md#requester-credential) |
 | How does a Foundry agent call a Copilot Studio agent over A2A? | [One request, from Router to Studio](docs/foundry-apim-studio.md#the-foundry-to-studio-connection) |
 | Where do I configure the agents' routes, backends and policies in APIM? | [The three APIM APIs](docs/foundry-apim-studio.md#configure-agent-routes-in-apim), then [deploy the routes](docs/replicate-demo.md#7-configure-the-three-apim-routes) |
 | How does APIM authenticate the Router and call Studio as the shared connection owner? | [Credential exchange inside APIM](docs/foundry-apim-studio.md#credential-exchange-inside-apim) |
 | How does the Router discover the right agent? | [API Center discovery](docs/foundry-apim-studio.md#discovery-is-separate-from-the-gateway) |
+| Why probe the Router's caller before enabling business requests? | [First-deployment identity sequence](docs/replicate-demo.md#resolve-the-platform-caller-before-enabling-business-routing) |
 | Where are the agent instructions, reference documents and runnable code? | [Follow a supplier question through the source](docs/foundry-apim-studio.md#1-follow-one-supplier-question) |
 
 APIM exposes and protects the agents' APIs. **It does not host their prompts or
