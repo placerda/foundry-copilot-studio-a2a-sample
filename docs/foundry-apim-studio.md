@@ -3,10 +3,9 @@
 [Home](../README.md) · [Local setup](setup.md) · [Architecture](connectivity.md) ·
 [Operations](operations.md) · [Status](status.md)
 
-This is a reading and configuration path through the **existing Motors
-implementation**, not another sample to deploy beside it. Read sections 1–3
-before configuring services. Sections 4–6 describe operator work requiring
-separate authorization; cloning and testing do not perform that work.
+This guide shows how the Contoso Motors sample connects a Microsoft Foundry
+agent to a Copilot Studio agent through Azure API Management. It explains the
+code, authentication flow, and configuration steps.
 
 ## 1. Follow one supplier question
 

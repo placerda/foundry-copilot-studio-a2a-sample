@@ -2,12 +2,13 @@ import { readFile, writeFile } from "node:fs/promises"
 import { fileURLToPath } from "node:url"
 
 const output = new URL("../docs/", import.meta.url)
-const width = 1880
+const width = 1500
 const height = 1600
 const colors = { blue: "#0078d4", teal: "#008575", gray: "#7b8fa3" }
 const fragments = []
 const elements = []
 const files = {}
+let offsetX = 0
 const escape = value => String(value).replace(/[&<>"]/g, char => ({
   "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;",
 })[char])
@@ -25,6 +26,7 @@ function element(type, x, y, w, h, extra = {}) {
 }
 
 function rect(x, y, w, h, { fill = "none", stroke = "#b5cde0", dashed = false, radius = 10 } = {}) {
+  x += offsetX
   fragments.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${radius}" fill="${fill}" stroke="${stroke}" stroke-width="2"${dashed ? ' stroke-dasharray="8 7"' : ""}/>`)
   element("rectangle", x, y, w, h, {
     backgroundColor: fill === "none" ? "transparent" : fill,
@@ -34,6 +36,7 @@ function rect(x, y, w, h, { fill = "none", stroke = "#b5cde0", dashed = false, r
 }
 
 function text(x, y, lines, size = 23, weight = 400, maxWidth = 500) {
+  x += offsetX
   const values = Array.isArray(lines) ? lines : [lines]
   fragments.push(`<text x="${x}" y="${y + size}" data-max-width="${maxWidth}" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="${size}" font-weight="${weight}" fill="#000000">${values.map((line, i) => `<tspan x="${x}" dy="${i ? size * 1.45 : 0}">${escape(line)}</tspan>`).join("")}</text>`)
   element("text", x, y, maxWidth, values.length * size * 2.5, {
@@ -44,6 +47,7 @@ function text(x, y, lines, size = 23, weight = 400, maxWidth = 500) {
 }
 
 async function icon(name, x, y, size = 48) {
+  x += offsetX
   if (!files[name]) {
     const bytes = await readFile(new URL(`icons/${name}.svg`, output))
     files[name] = {
@@ -59,6 +63,7 @@ async function icon(name, x, y, size = 48) {
 }
 
 function arrow(points, color = colors.blue, { dashed = false, both = false } = {}) {
+  points = points.map(([x, y]) => [x + offsetX, y])
   const path = points.map((p, i) => `${i ? "L" : "M"} ${p.join(" ")}`).join(" ")
   fragments.push(`<path d="${path}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linejoin="round"${dashed ? ' stroke-dasharray="7 7"' : ""} marker-end="url(#arrow-${color.slice(1)})"${both ? ` marker-start="url(#arrow-${color.slice(1)})"` : ""}/>`)
   const [x, y] = points[0]
@@ -79,11 +84,12 @@ async function card(x, y, w, h, title, body, product, fill = "#ffffff") {
   text(x + 24, y + 82, body, 22, 400, w - 48)
 }
 
-text(60, 36, "Contoso Motors", 52, 650, 1700)
-text(60, 103, "Governed agent collaboration across Teams, Foundry and Copilot Studio", 29, 400, 1760)
-rect(40, 172, 1800, 1330, { stroke: "#a9bdcf", dashed: true, radius: 14 })
-text(64, 189, "CONTOSO ENVIRONMENT", 20, 600, 360)
+text(60, 36, "Contoso Motors", 52, 650, 1380)
+text(60, 103, "Governed agent collaboration across Teams, Foundry and Copilot Studio", 29, 400, 1380)
+rect(40, 172, 1420, 1330, { stroke: "#a9bdcf", dashed: true, radius: 14 })
 
+// Reclaim the former annotation column without changing the component layout.
+offsetX = -380
 text(530, 191, "USER CHANNEL", 20, 600, 360)
 text(1000, 191, "POWER PLATFORM", 20, 600, 360)
 text(1430, 191, "LOCAL APPLICATION", 20, 600, 360)
@@ -108,7 +114,7 @@ await card(1380, 535, 400, 205, "API Management",
   ["Developer / External VNet", "Entry + specialist A2A routes", "Credential Manager"], "apim", "#f4f8fc")
 
 arrow([[710, 380], [710, 411], [462, 411], [462, 650], [530, 650]])
-text(290, 474, ["Activity", "HTTPS + auth"], 19, 400, 160)
+text(490, 383, "Activity / HTTPS", 18, 400, 205)
 arrow([[1610, 380], [1610, 535]])
 text(1630, 451, ["Bearer", "A2A 1.0"], 20, 400, 155)
 arrow([[1495, 535], [1495, 406], [1180, 406], [1180, 380]])
@@ -157,28 +163,17 @@ await icon("api-center", 545, 1386, 48)
 text(615, 1380, "API Center", 27, 600, 1100)
 text(615, 1418, "Capability catalog + approved A2A routes + source metadata  |  Read on every request", 21, 400, 1110)
 arrow([[530, 707], [468, 707], [468, 1415], [520, 1415]], colors.teal)
-text(252, 1288, ["Per-request discovery", "Router identity"], 19, 400, 205)
 
-await icon("users", 80, 586, 48)
-text(144, 589, "Separate identities", 25, 600, 270)
-text(80, 654, ["User signs in to the app.", "Python authenticates to APIM.", "Router reads the catalog.", "Studio uses shared delegation."], 22, 400, 335)
-await icon("vpn", 80, 887, 48)
-text(144, 890, "Private operations", 25, 600, 270)
-text(80, 955, ["Approved workstation", "VPN + private DNS", "Pinned SDK / ACR workflow"], 22, 400, 335)
-text(80, 1074, ["Operator access is separate", "from conversation traffic."], 20, 400, 335)
-text(80, 1186, "No Function or App Service", 22, 600, 340)
-text(80, 1224, "No separate Azure Bot resource", 20, 400, 340)
-
+offsetX = 0
 arrow([[65, 1540], [120, 1540]], colors.blue)
 text(138, 1523, "Authenticated messages", 20, 400, 380)
 arrow([[535, 1540], [590, 1540]], colors.teal)
 text(608, 1523, "Catalog discovery", 20, 400, 320)
 arrow([[940, 1540], [995, 1540]], colors.gray, { dashed: true })
 text(1013, 1523, "Network / private access", 20, 400, 360)
-text(1435, 1523, "Synthetic demo, not business actions", 18, 400, 390)
 
 const title = "Contoso Motors agent collaboration architecture"
-const description = "Microsoft Teams uses the native authenticated Activity route to the Foundry Hosted Router. The local Python requester calls API Management using a Bearer token obtained with a certificate. The Router discovers capabilities in API Center and calls APIM specialist routes. APIM uses shared delegated credentials for the Copilot Studio supplier and managed identity for the Foundry logistics Prompt Agent. The workload VNet contains Hosted, private endpoint and External APIM subnets. Shared Azure services and private operator access are shown separately. No legacy Function, separate Azure Bot, Cosmos DB or AI Search is implied."
+const description = "Microsoft Teams uses the native authenticated Activity route to the Foundry Hosted Router. The local Python requester calls API Management using a Bearer token obtained with a certificate. The Router discovers capabilities in API Center and calls APIM specialist routes. APIM uses shared delegated credentials for the Copilot Studio supplier and managed identity for the Foundry logistics Prompt Agent. The workload VNet contains Hosted, private endpoint and External APIM subnets. Shared Azure services appear below the network."
 const markers = Object.values(colors).map(color => `<marker id="arrow-${color.slice(1)}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="${color}"/></marker>`).join("")
 const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-labelledby="title desc"><title id="title">${escape(title)}</title><desc id="desc">${escape(description)}</desc><defs>${markers}</defs><rect width="100%" height="100%" fill="#ffffff"/>${fragments.join("\n")}</svg>`
 const name = "contoso-motors-architecture"

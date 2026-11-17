@@ -11,8 +11,8 @@ The Teams product icon is the unmodified
 See Microsoft's [architecture icon use terms](https://learn.microsoft.com/en-us/previous-versions/microsoft-365/solutions/architecture-icons-templates).
 
 The current overview uses the Azure pack's API Center, Foundry Agent Service,
-Foundry Project, AI Foundry, Browser, Users and Virtual Networks icons alongside
-the existing APIM, Private Link, VPN, Storage, Key Vault, ACR and Monitor icons.
+Foundry Project, AI Foundry, Browser and Virtual Networks icons alongside
+the existing APIM, Private Link, Storage, Key Vault, ACR and Monitor icons.
 The Copilot Studio and Teams icons retain their original brand colors.
 Only diagram borders and connectors use the Microsoft-blue palette.
 
